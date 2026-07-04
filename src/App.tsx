@@ -57,7 +57,10 @@ function AddBotForm({ onboarding = false, onDone, onCancel }: { onboarding?: boo
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setError(''); setBusy(true);
-    try { onDone(await window.tgManager.addBot({ name, token })); }
+    try {
+      if (!window.tgManager) throw new Error('Откройте BotDesk как desktop-приложение, а не как страницу в браузере.');
+      onDone(await window.tgManager.addBot({ name, token }));
+    }
     catch (e) { setError(e instanceof Error ? e.message : 'Не удалось добавить бота'); }
     finally { setBusy(false); }
   };
