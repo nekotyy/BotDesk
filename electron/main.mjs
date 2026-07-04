@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, ipcMain, safeStorage } from 'electron';
+import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron';
 import Store from 'electron-store';
 import { v4 as uuid } from 'uuid';
 
@@ -211,6 +211,14 @@ async function createWindow() {
   });
   if (process.env.VITE_DEV_SERVER_URL) await window.loadURL(process.env.VITE_DEV_SERVER_URL);
   else await window.loadFile(path.join(__dirname, '../dist/index.html'));
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://')) void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  window.webContents.on('will-navigate', (event, url) => {
+    const current = window.webContents.getURL();
+    if (url !== current) event.preventDefault();
+  });
 }
 
 app.whenReady().then(async () => {
