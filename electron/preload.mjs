@@ -2,9 +2,12 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('tgManager', {
   getState: () => ipcRenderer.invoke('state:get'),
-  addBot: (payload) => ipcRenderer.invoke('bot:add', payload),
+  addBot: (input) => ipcRenderer.invoke('bot:add', input),
+  removeBot: (botId) => ipcRenderer.invoke('bot:remove', botId),
   selectBot: (botId) => ipcRenderer.invoke('bot:select', botId),
   syncBot: (botId) => ipcRenderer.invoke('bot:sync', botId),
-  openChatByUserId: (payload) => ipcRenderer.invoke('chat:openByUserId', payload),
-  sendMessage: (payload) => ipcRenderer.invoke('chat:sendMessage', payload),
+  findChat: (botId, userId) => ipcRenderer.invoke('chat:find', botId, userId),
+  sendMessage: (botId, chatId, text) => ipcRenderer.invoke('message:send', botId, chatId, text),
+  getAvatar: (botId, fileId) => ipcRenderer.invoke('avatar:get', botId, fileId),
 });
+

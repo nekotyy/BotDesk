@@ -1,38 +1,57 @@
-export type SenderType = 'bot' | 'user';
-
-export interface BotSummary {
+export type Bot = {
   id: string;
   name: string;
   username: string;
+  telegramId: number;
+  avatarUrl?: string;
+  avatarFileId?: string;
   createdAt: string;
-}
+  lastSyncAt?: string;
+  status: 'online' | 'offline' | 'syncing';
+};
 
-export interface ChatSummary {
+export type Chat = {
   id: string;
-  userId: string;
-  username: string;
-  firstName: string;
-  lastName: string;
-  avatarUrl: string;
-  lastMessageText: string;
-  lastMessageAt: string;
-}
+  telegramId: number;
+  type: 'private' | 'group' | 'supergroup' | 'channel';
+  title: string;
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  avatarUrl?: string;
+  avatarFileId?: string;
+  lastMessage?: string;
+  lastMessageAt?: string;
+  unreadCount: number;
+};
 
-export interface ChatMessage {
+export type Message = {
   id: string;
-  from: SenderType;
+  telegramId?: number;
+  chatId: string;
   text: string;
-  createdAt: string;
-}
+  direction: 'incoming' | 'outgoing';
+  senderName: string;
+  sentAt: string;
+  status: 'sending' | 'sent' | 'failed';
+};
 
-export interface AppState {
-  bots: BotSummary[];
+export type AppState = {
+  bots: Bot[];
   selectedBotId: string | null;
-  chatsByBot: Record<string, ChatSummary[]>;
-  messagesByBot: Record<string, Record<string, ChatMessage[]>>;
-}
+  chatsByBot: Record<string, Chat[]>;
+  messagesByBot: Record<string, Record<string, Message[]>>;
+};
 
-export interface OpenChatResult {
-  state: AppState;
-  chatId: string | null;
-}
+export type AddBotInput = { name: string; token: string };
+
+export type TgManagerApi = {
+  getState(): Promise<AppState>;
+  addBot(input: AddBotInput): Promise<AppState>;
+  removeBot(botId: string): Promise<AppState>;
+  selectBot(botId: string): Promise<AppState>;
+  syncBot(botId: string): Promise<AppState>;
+  findChat(botId: string, userId: string): Promise<{ state: AppState; chatId: string }>;
+  sendMessage(botId: string, chatId: string, text: string): Promise<AppState>;
+  getAvatar(botId: string, fileId: string): Promise<string | null>;
+};

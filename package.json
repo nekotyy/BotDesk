@@ -1,53 +1,56 @@
 {
-  "name": "tg-bot-manager",
+  "name": "botdesk",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
   "main": "electron/main.mjs",
+  "description": "Desktop manager for Telegram bots and their conversations",
   "scripts": {
     "dev": "concurrently -k \"npm:dev:web\" \"npm:dev:electron\"",
-    "dev:web": "vite",
+    "dev:web": "vite --host 127.0.0.1",
     "dev:electron": "wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
-    "start": "electron .",
     "build:web": "tsc -b && vite build",
     "build": "npm run build:web && electron-builder",
-    "lint": "oxlint",
-    "preview": "vite preview"
+    "lint": "oxlint src",
+    "typecheck": "tsc -b --pretty false"
   },
   "build": {
-    "appId": "com.nekotyy.tgbotmanager",
-    "productName": "TG Bot Manager",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "package.json"
-    ],
+    "appId": "app.botdesk.desktop",
+    "productName": "BotDesk",
+    "asar": true,
+    "directories": { "output": "release" },
+    "files": ["dist/**/*", "electron/**/*", "package.json"],
     "win": {
-      "target": "nsis"
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "artifactName": "BotDesk-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "BotDesk"
     }
   },
   "dependencies": {
-    "date-fns": "^4.4.0",
-    "electron": "^43.0.0",
     "electron-store": "^11.0.2",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "uuid": "^14.0.1"
+    "lucide-react": "^0.468.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@types/node": "^24.13.2",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.3",
-    "concurrently": "^10.0.3",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
-    "electron-builder": "^26.15.3",
-    "oxlint": "^1.71.0",
-    "typescript": "~6.0.2",
-    "vite": "^8.1.1",
-    "wait-on": "^9.0.10"
+    "electron": "^39.2.0",
+    "electron-builder": "^26.0.12",
+    "oxlint": "^1.32.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2",
+    "wait-on": "^9.0.3"
   }
 }
+
