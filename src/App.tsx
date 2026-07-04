@@ -1,14 +1,26 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowLeft, Bot as BotIcon, Check, ChevronRight, CircleHelp, Eye, EyeOff,
-  Hash, Inbox, LoaderCircle, MessageCircleMore, MoreHorizontal, Plus,
-  RefreshCw, Search, Send, ShieldCheck, Sparkles, Trash2, UserRoundSearch, X,
+  AlertTriangle, ArrowLeft, Bot as BotIcon, Check, ChevronRight, CircleHelp,
+  Eye, EyeOff, Hash, Inbox, LoaderCircle, MessageCircleMore, Plus,
+  Radio, RefreshCw, Search, Send, ShieldCheck, Sparkles, Trash2,
+  UserRoundSearch, Wifi, WifiOff, X,
 } from 'lucide-react';
 import type { AppState, Bot, Chat, Message } from './types';
 import './App.css';
 
 const emptyState: AppState = { bots: [], selectedBotId: null, chatsByBot: {}, messagesByBot: {} };
 const avatarCache = new Map<string, string>();
+const demoBot: Bot = { id: 'demo-bot', name: 'Support Bot', username: 'support_demo_bot', telegramId: 100001, createdAt: new Date().toISOString(), lastSyncAt: new Date().toISOString(), status: 'online' };
+const demoChat: Chat = { id: 'demo-chat', telegramId: 6605474392, type: 'private', title: 'Анна Волкова', firstName: 'Анна', lastName: 'Волкова', username: 'anna_volkova', lastMessage: 'Да, теперь всё работает. Спасибо!', lastMessageAt: new Date().toISOString(), unreadCount: 0 };
+const demoState: AppState = {
+  bots: [demoBot], selectedBotId: demoBot.id,
+  chatsByBot: { [demoBot.id]: [demoChat] },
+  messagesByBot: { [demoBot.id]: { [demoChat.id]: [
+    { id: 'demo-1', chatId: demoChat.id, text: 'Здравствуйте! Подскажите, как подключить уведомления?', direction: 'incoming', senderName: 'Анна Волкова', sentAt: new Date(Date.now() - 180_000).toISOString(), status: 'sent' },
+    { id: 'demo-2', chatId: demoChat.id, text: 'Откройте настройки бота и включите пункт «Новые сообщения».', direction: 'outgoing', senderName: demoBot.name, sentAt: new Date(Date.now() - 120_000).toISOString(), status: 'sent' },
+    { id: 'demo-3', chatId: demoChat.id, text: 'Да, теперь всё работает. Спасибо!', direction: 'incoming', senderName: 'Анна Волкова', sentAt: new Date().toISOString(), status: 'sent' },
+  ] } },
+};
 
 function initials(value: string) {
   return value.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'TG';
@@ -132,24 +144,25 @@ function BotHub({ state, onOpen, onAdd, onRemove }: { state: AppState; onOpen: (
     <div className="hub__summary"><div><BotIcon /><span><b>{state.bots.length}</b><small>подключено из 15</small></span></div><div><MessageCircleMore /><span><b>{Object.values(state.chatsByBot).reduce((sum, chats) => sum + chats.length, 0)}</b><small>диалогов сохранено</small></span></div></div>
     <section className="bot-grid" aria-label="Подключённые боты">{state.bots.map((bot) => {
       const chats = state.chatsByBot[bot.id] || []; const unread = chats.reduce((sum, chat) => sum + chat.unreadCount, 0);
-      return <article className="bot-card" key={bot.id}><div className="bot-card__top"><Avatar title={bot.name} botId={bot.id} fileId={bot.avatarFileId} size="lg" online={bot.status === 'online'} /><button className="icon-button danger-on-hover" onClick={() => onRemove(bot)} aria-label={`Удалить ${bot.name}`}><Trash2 /></button></div><h2>{bot.name}</h2><p>@{bot.username || 'без username'}</p><div className="bot-card__meta"><span><MessageCircleMore /> {chats.length} чатов</span>{unread > 0 && <span className="unread-label">{unread} новых</span>}</div><button className="button button--card" onClick={() => onOpen(bot)}>Открыть диалоги <ChevronRight /></button></article>;
+      return <article className="bot-card" key={bot.id}><div className="bot-card__top"><Avatar title={bot.name} botId={bot.id} fileId={bot.avatarFileId} size="lg" online={bot.status === 'online'} /><div className="bot-card__actions"><span className={`status-chip status-chip--${bot.status}`}>{bot.status === 'online' ? <Wifi /> : bot.status === 'syncing' ? <RefreshCw className="spin" /> : <WifiOff />}{bot.status === 'online' ? 'На связи' : bot.status === 'syncing' ? 'Обновление' : 'Нет входящих'}</span><button className="icon-button danger-on-hover" onClick={() => onRemove(bot)} aria-label={`Удалить ${bot.name}`}><Trash2 /></button></div></div><h2>{bot.name}</h2><p>@{bot.username || 'без username'}</p>{bot.lastError && <div className="bot-card__warning"><AlertTriangle /> Проверьте подключение</div>}<div className="bot-card__meta"><span><MessageCircleMore /> {chats.length} чатов</span>{unread > 0 && <span className="unread-label">{unread} новых</span>}</div><button className="button button--card" onClick={() => onOpen(bot)}>Открыть сообщения <ChevronRight /></button></article>;
     })}{state.bots.length < 15 && <button className="bot-card bot-card--add" onClick={onAdd}><span><Plus /></span><b>Подключить ещё бота</b><small>Осталось мест: {15 - state.bots.length}</small></button>}</section>
   </main></div>;
 }
 
 function ChatRow({ chat, botId, active, onClick }: { chat: Chat; botId: string; active: boolean; onClick: () => void }) {
-  return <button className={`chat-row ${active ? 'is-active' : ''}`} onClick={onClick}><Avatar title={chat.title} botId={botId} fileId={chat.avatarFileId} size="md" /><span className="chat-row__body"><span className="chat-row__line"><b>{chat.title}</b><time>{timeLabel(chat.lastMessageAt)}</time></span><span className="chat-row__line"><small>{chat.lastMessage || (chat.username ? `@${chat.username}` : `ID ${chat.telegramId}`)}</small>{chat.unreadCount > 0 && <i>{chat.unreadCount > 99 ? '99+' : chat.unreadCount}</i>}</span></span></button>;
+  return <button className={`chat-row ${active ? 'is-active' : ''}`} onClick={onClick} aria-label={`Открыть диалог с ${chat.title}`}><Avatar title={chat.title} botId={botId} fileId={chat.avatarFileId} size="md" /><span className="chat-row__body"><span className="chat-row__line"><b>{chat.title}</b><time>{timeLabel(chat.lastMessageAt)}</time></span><span className="chat-row__line"><small>{chat.lastMessage || (chat.username ? `@${chat.username}` : `ID ${chat.telegramId}`)}</small>{chat.unreadCount > 0 && <i>{chat.unreadCount > 99 ? '99+' : chat.unreadCount}</i>}</span></span></button>;
 }
 
-function Conversation({ bot, chat, messages, onSend }: { bot: Bot; chat?: Chat; messages: Message[]; onSend: (text: string) => Promise<void> }) {
-  const [draft, setDraft] = useState(''); const [sending, setSending] = useState(false); const endRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length, chat?.id]);
+function Conversation({ bot, chat, messages, syncing, onRetry, onSend }: { bot: Bot; chat?: Chat; messages: Message[]; syncing: boolean; onRetry: () => void; onSend: (text: string) => Promise<void> }) {
+  const [draft, setDraft] = useState(''); const [sending, setSending] = useState(false); const messagesRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { const container = messagesRef.current; if (container) container.scrollTop = container.scrollHeight; }, [messages.length, chat?.id]);
   if (!chat) return <section className="conversation conversation--empty"><div className="empty-conversation"><span><MessageCircleMore /></span><h2>Выберите диалог</h2><p>Сообщения и информация о пользователе появятся здесь.</p></div></section>;
   const send = async () => { const text = draft.trim(); if (!text || sending) return; setSending(true); try { await onSend(text); setDraft(''); } finally { setSending(false); } };
   const keyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } };
   let previousDay = '';
-  return <section className="conversation"><header className="conversation__header"><Avatar title={chat.title} botId={bot.id} fileId={chat.avatarFileId} size="sm" /><div><b>{chat.title}</b><small>{chat.username ? `@${chat.username} · ` : ''}ID {chat.telegramId}</small></div><button className="icon-button" aria-label="Дополнительные действия"><MoreHorizontal /></button></header>
-    <div className="messages" aria-live="polite">{messages.length === 0 && <div className="history-start"><ShieldCheck /><span><b>Начало локальной истории</b><small>Bot API не отдаёт старую переписку. Новые сообщения сохранятся здесь.</small></span></div>}{messages.map((message) => { const day = dayLabel(message.sentAt); const showDay = day !== previousDay; previousDay = day; return <div key={message.id}>{showDay && <div className="day-divider"><span>{day}</span></div>}<div className={`message-line message-line--${message.direction}`}><div className="message-bubble"><p>{message.text}</p><span>{timeLabel(message.sentAt)} {message.direction === 'outgoing' && <Check aria-label="Отправлено" />}</span></div></div></div>; })}<div ref={endRef} /></div>
+  return <section className="conversation"><header className="conversation__header"><Avatar title={chat.title} botId={bot.id} fileId={chat.avatarFileId} size="sm" /><div><b>{chat.title}</b><small>{chat.username ? `@${chat.username} · ` : ''}ID {chat.telegramId}</small></div><span className={`live-state ${bot.status === 'online' ? 'is-online' : 'is-offline'}`}>{bot.status === 'online' ? <Radio /> : <WifiOff />}{bot.status === 'online' ? 'Входящие включены' : 'Нет соединения'}</span></header>
+    {bot.lastError && <div className="connection-banner" role="alert"><AlertTriangle /><span><b>Входящие сообщения временно не поступают</b><small>{bot.lastError}</small></span><button onClick={onRetry} disabled={syncing}>{syncing ? <LoaderCircle className="spin" /> : <RefreshCw />} Повторить</button></div>}
+    <div className="messages" ref={messagesRef} aria-live="polite">{messages.length === 0 && <div className="history-start"><ShieldCheck /><span><b>Диалог подключён</b><small>Ожидаем новое сообщение пользователя. Старая история недоступна через Bot API.</small></span></div>}{messages.map((message) => { const day = dayLabel(message.sentAt); const showDay = day !== previousDay; previousDay = day; return <div key={message.id}>{showDay && <div className="day-divider"><span>{day}</span></div>}<div className={`message-line message-line--${message.direction}`}>{message.direction === 'incoming' && <Avatar title={message.senderName || chat.title} botId={bot.id} fileId={chat.avatarFileId} size="sm" />}<div className="message-stack">{message.direction === 'incoming' && <b className="message-sender">{message.senderName || chat.title}</b>}<div className="message-bubble"><p>{message.text}</p><span>{timeLabel(message.sentAt)} {message.direction === 'outgoing' && <Check aria-label="Отправлено" />}</span></div></div></div></div>; })}</div>
     <footer className="composer"><textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={keyDown} placeholder={`Сообщение для ${chat.firstName || chat.title}`} rows={1} maxLength={4096} aria-label="Текст сообщения" /><span className="composer__count">{draft.length > 3800 ? `${draft.length}/4096` : ''}</span><button onClick={() => void send()} disabled={!draft.trim() || sending} aria-label="Отправить сообщение">{sending ? <LoaderCircle className="spin" /> : <Send />}</button></footer>
   </section>;
 }
@@ -160,24 +173,28 @@ function Workspace({ state, bot, onState, onHome, onAdd, notify }: { state: AppS
   const filtered = useMemo(() => { const q = query.trim().toLowerCase(); return q ? chats.filter((c) => `${c.title} ${c.username || ''} ${c.telegramId}`.toLowerCase().includes(q)) : chats; }, [chats, query]);
   const activeChat = chats.find((chat) => chat.id === activeChatId); const messages = activeChatId ? state.messagesByBot[bot.id]?.[activeChatId] || [] : [];
   const sync = async (quiet = false) => { if (syncing) return; setSyncing(true); try { onState(await window.tgManager.syncBot(bot.id)); if (!quiet) notify('Диалоги синхронизированы', 'success'); } catch (e) { if (!quiet) notify(e instanceof Error ? e.message : 'Ошибка синхронизации', 'error'); } finally { setSyncing(false); } };
-  useEffect(() => { void sync(true); const timer = window.setInterval(() => void sync(true), 12_000); return () => window.clearInterval(timer); }, [bot.id]);
   const openChat = async (chat: Chat) => { setActiveChatId(chat.id); if (chat.unreadCount) { try { onState(await window.tgManager.markRead(bot.id, chat.id)); } catch { /* local UI remains usable */ } } };
+  useEffect(() => { if (!activeChatId && chats[0]) void openChat(chats[0]); }, [bot.id, chats[0]?.id]);
   const find = async (event: FormEvent) => { event.preventDefault(); setFinding(true); try { const result = await window.tgManager.findChat(bot.id, userId); onState(result.state); setActiveChatId(result.chatId); setShowId(false); setUserId(''); notify('Диалог найден', 'success'); } catch (e) { notify(e instanceof Error ? e.message : 'Чат не найден', 'error'); } finally { setFinding(false); } };
   const send = async (text: string) => { if (!activeChatId) return; try { onState(await window.tgManager.sendMessage(bot.id, activeChatId, text)); } catch (e) { notify(e instanceof Error ? e.message : 'Не удалось отправить сообщение', 'error'); throw e; } };
   return <div className="app-shell"><BotRail bots={state.bots} activeId={bot.id} onHome={onHome} onOpen={async (next) => { onState(await window.tgManager.selectBot(next.id)); setActiveChatId(undefined); }} onAdd={onAdd} />
     <aside className="chat-panel"><header className="chat-panel__header"><button className="mobile-back" onClick={onHome} aria-label="Назад к ботам"><ArrowLeft /></button><div className="bot-heading"><Avatar title={bot.name} size="sm" online={bot.status === 'online'} /><span><b>{bot.name}</b><small>@{bot.username}</small></span></div><button className="icon-button" onClick={() => void sync()} aria-label="Синхронизировать" disabled={syncing}><RefreshCw className={syncing ? 'spin' : ''} /></button></header>
+      <div className={`sync-strip sync-strip--${bot.status}`}>{bot.status === 'online' ? <Wifi /> : bot.status === 'syncing' ? <LoaderCircle className="spin" /> : <WifiOff />}<span><b>{bot.status === 'online' ? 'Входящие активны' : bot.status === 'syncing' ? 'Получаем сообщения…' : 'Входящие остановлены'}</b><small>{bot.lastSyncAt ? <>Последняя проверка {timeLabel(bot.lastSyncAt)}</> : 'Проверяем соединение'}</small></span></div>
       <div className="chat-tools"><div className="search-box"><Search /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Имя, username или ID" aria-label="Поиск диалогов" />{query && <button onClick={() => setQuery('')} aria-label="Очистить поиск"><X /></button>}</div><button className="id-button" onClick={() => setShowId(true)}><UserRoundSearch /> Открыть по ID</button></div>
       <div className="chat-list">{filtered.length ? filtered.map((chat) => <ChatRow key={chat.id} chat={chat} botId={bot.id} active={chat.id === activeChatId} onClick={() => void openChat(chat)} />) : <div className="empty-list"><span><Inbox /></span><b>{query ? 'Ничего не найдено' : 'Пока нет диалогов'}</b><p>{query ? 'Попробуйте другой запрос.' : 'Нажмите «Обновить» или откройте чат по ID.'}</p></div>}</div>
-    </aside><Conversation bot={bot} chat={activeChat} messages={messages} onSend={send} />
+    </aside><Conversation bot={bot} chat={activeChat} messages={messages} syncing={syncing} onRetry={() => void sync()} onSend={send} />
     {showId && <Modal onClose={() => setShowId(false)} labelledBy="find-title"><button className="modal__close" onClick={() => setShowId(false)} aria-label="Закрыть"><X /></button><span className="modal__icon"><Hash /></span><h2 id="find-title">Открыть диалог по ID</h2><p>Если пользователь уже общался с ботом, Telegram разрешит открыть этот чат.</p><form onSubmit={find}><div className="field"><label htmlFor="user-id">Telegram user ID</label><input id="user-id" inputMode="numeric" value={userId} onChange={(e) => setUserId(e.target.value.replace(/[^\d-]/g, ''))} placeholder="Например, 123456789" autoFocus /></div><div className="form-actions"><button type="button" className="button button--quiet" onClick={() => setShowId(false)}>Отмена</button><button className="button button--primary" disabled={!userId || finding}>{finding ? <><LoaderCircle className="spin" /> Ищу…</> : 'Найти диалог'}</button></div></form><small className="modal__hint"><ShieldCheck /> Бот не может первым написать пользователю, который с ним ещё не взаимодействовал.</small></Modal>}
   </div>;
 }
 
 export default function App() {
-  const [state, setState] = useState<AppState>(emptyState); const [loading, setLoading] = useState(true); const [screen, setScreen] = useState<'bots' | 'workspace'>('bots'); const [addOpen, setAddOpen] = useState(false); const [removeBot, setRemoveBot] = useState<Bot>(); const [toast, setToast] = useState<{ text: string; type: 'error' | 'success' }>();
+  const demoMode = new URLSearchParams(window.location.search).get('demo');
+  const [state, setState] = useState<AppState>(demoMode ? demoState : emptyState); const [loading, setLoading] = useState(true); const [screen, setScreen] = useState<'bots' | 'workspace'>(demoMode === 'workspace' ? 'workspace' : 'bots'); const [addOpen, setAddOpen] = useState(false); const [removeBot, setRemoveBot] = useState<Bot>(); const [toast, setToast] = useState<{ text: string; type: 'error' | 'success' }>();
   useEffect(() => {
     if (!window.tgManager) { setLoading(false); return; }
     window.tgManager.getState().then(setState).catch((e) => setToast({ text: e instanceof Error ? e.message : 'Не удалось загрузить данные', type: 'error' })).finally(() => setLoading(false));
+    const stopState = window.tgManager.onStateChanged(setState);
+    return stopState;
   }, []);
   useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(undefined), 4200); return () => window.clearTimeout(timer); }, [toast]);
   const notify = (text: string, type: 'error' | 'success' = 'success') => setToast({ text, type });
