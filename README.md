@@ -47,7 +47,7 @@ npm run build:web
 npm run build
 ```
 
-Готовый NSIS-установщик появится в `release/BotDesk-Setup-1.0.0.exe`.
+Готовая portable-версия появится в `release/BotDesk-Portable-1.0.0.exe`. Установка не нужна: это один самостоятельный файл со всеми зависимостями внутри.
 
 ## Где хранятся данные
 

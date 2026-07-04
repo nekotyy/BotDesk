@@ -22,14 +22,8 @@
     "directories": { "output": "release" },
     "files": ["dist/**/*", "electron/**/*", "package.json"],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
-      "artifactName": "BotDesk-Setup-${version}.${ext}"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "shortcutName": "BotDesk"
+      "target": [{ "target": "portable", "arch": ["x64"] }],
+      "artifactName": "BotDesk-Portable-${version}.${ext}"
     }
   },
   "dependencies": {
