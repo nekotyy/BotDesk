@@ -1,6 +1,6 @@
 {
   "name": "botdesk",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "main": "electron/main.mjs",
@@ -19,10 +19,23 @@
     "appId": "app.botdesk.desktop",
     "productName": "BotDesk",
     "asar": true,
-    "directories": { "output": "release" },
-    "files": ["dist/**/*", "electron/**/*", "package.json"],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
     "win": {
-      "target": [{ "target": "portable", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "artifactName": "BotDesk-Portable-${version}.${ext}"
     }
   },
