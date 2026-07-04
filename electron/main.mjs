@@ -7,6 +7,13 @@ import { v4 as uuid } from 'uuid';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MAX_BOTS = 15;
 const API_TIMEOUT_MS = 20_000;
+const POLL_INTERVAL_MS = 5_000;
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+let mainWindow;
+let pollTimer;
+const syncInFlight = new Set();
+
+if (!hasSingleInstanceLock) app.quit();
 
 const store = new Store({
   name: 'botdesk-state',
@@ -138,10 +145,12 @@ async function profilePhotoFileId(token, userId) {
 }
 
 async function syncBot(botId) {
-  const bot = getBot(botId);
-  const token = decryptToken(bot);
-  setBot(botId, { status: 'syncing' });
+  if (syncInFlight.has(botId)) return publicState();
+  syncInFlight.add(botId);
   try {
+    const bot = getBot(botId);
+    const token = decryptToken(bot);
+    setBot(botId, { status: 'syncing', lastError: undefined });
     const offsets = store.get('updateOffsets', {});
     const updates = await telegram(token, 'getUpdates', {
       offset: offsets[botId] || 0,
@@ -185,12 +194,41 @@ async function syncBot(botId) {
     }));
 
     store.set('updateOffsets', { ...offsets, [botId]: maxUpdateId });
-    setBot(botId, { status: 'online', lastSyncAt: new Date().toISOString() });
+    setBot(botId, { status: 'online', lastSyncAt: new Date().toISOString(), lastError: undefined });
     return publicState();
   } catch (error) {
-    setBot(botId, { status: 'offline' });
+    setBot(botId, { status: 'offline', lastError: error instanceof Error ? error.message : 'Ошибка синхронизации' });
     throw error;
+  } finally {
+    syncInFlight.delete(botId);
   }
+}
+
+function broadcastState() {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('state:changed', publicState());
+}
+
+async function pollAllBots() {
+  const bots = store.get('bots', []);
+  await Promise.all(bots.map(async (bot) => {
+    try {
+      await syncBot(bot.id);
+    } catch (error) {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('sync:error', {
+          botId: bot.id,
+          message: error instanceof Error ? error.message : 'Ошибка синхронизации',
+        });
+      }
+    }
+  }));
+  broadcastState();
+}
+
+function startBackgroundPolling() {
+  clearInterval(pollTimer);
+  void pollAllBots();
+  pollTimer = setInterval(() => void pollAllBots(), POLL_INTERVAL_MS);
 }
 
 async function createWindow() {
@@ -219,9 +257,11 @@ async function createWindow() {
     const current = window.webContents.getURL();
     if (url !== current) event.preventDefault();
   });
+  mainWindow = window;
+  window.on('closed', () => { if (mainWindow === window) mainWindow = undefined; });
 }
 
-app.whenReady().then(async () => {
+if (hasSingleInstanceLock) app.whenReady().then(async () => {
   ipcMain.handle('state:get', () => publicState());
   ipcMain.handle('bot:add', async (_event, input) => {
     const name = String(input?.name || '').trim();
@@ -297,7 +337,15 @@ app.whenReady().then(async () => {
   });
 
   await createWindow();
+  startBackgroundPolling();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('second-instance', () => {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+});
+
+app.on('window-all-closed', () => { clearInterval(pollTimer); if (process.platform !== 'darwin') app.quit(); });

@@ -7,6 +7,7 @@ export type Bot = {
   avatarFileId?: string;
   createdAt: string;
   lastSyncAt?: string;
+  lastError?: string;
   status: 'online' | 'offline' | 'syncing';
 };
 
@@ -55,4 +56,6 @@ export type TgManagerApi = {
   sendMessage(botId: string, chatId: string, text: string): Promise<AppState>;
   markRead(botId: string, chatId: string): Promise<AppState>;
   getAvatar(botId: string, fileId: string): Promise<string | null>;
+  onStateChanged(callback: (state: AppState) => void): () => void;
+  onSyncError(callback: (payload: { botId: string; message: string }) => void): () => void;
 };

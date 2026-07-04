@@ -10,4 +10,14 @@ contextBridge.exposeInMainWorld('tgManager', {
   sendMessage: (botId, chatId, text) => ipcRenderer.invoke('message:send', botId, chatId, text),
   markRead: (botId, chatId) => ipcRenderer.invoke('chat:read', botId, chatId),
   getAvatar: (botId, fileId) => ipcRenderer.invoke('avatar:get', botId, fileId),
+  onStateChanged: (callback) => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on('state:changed', listener);
+    return () => ipcRenderer.removeListener('state:changed', listener);
+  },
+  onSyncError: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on('sync:error', listener);
+    return () => ipcRenderer.removeListener('sync:error', listener);
+  },
 });
