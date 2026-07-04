@@ -271,6 +271,13 @@ app.whenReady().then(async () => {
     if (current) upsertChat(botId, { ...current, lastMessage: text, lastMessageAt: new Date(result.date * 1000).toISOString() });
     return publicState();
   });
+  ipcMain.handle('chat:read', (_event, botId, chatId) => {
+    getBot(botId);
+    const all = store.get('chatsByBot', {});
+    const chats = (all[botId] || []).map((chat) => chat.id === String(chatId) ? { ...chat, unreadCount: 0 } : chat);
+    store.set('chatsByBot', { ...all, [botId]: chats });
+    return publicState();
+  });
   ipcMain.handle('avatar:get', async (_event, botId, fileId) => {
     if (!fileId) return null;
     const token = decryptToken(getBot(botId));

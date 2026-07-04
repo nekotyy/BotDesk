@@ -8,6 +8,6 @@ contextBridge.exposeInMainWorld('tgManager', {
   syncBot: (botId) => ipcRenderer.invoke('bot:sync', botId),
   findChat: (botId, userId) => ipcRenderer.invoke('chat:find', botId, userId),
   sendMessage: (botId, chatId, text) => ipcRenderer.invoke('message:send', botId, chatId, text),
+  markRead: (botId, chatId) => ipcRenderer.invoke('chat:read', botId, chatId),
   getAvatar: (botId, fileId) => ipcRenderer.invoke('avatar:get', botId, fileId),
 });
-

@@ -53,5 +53,6 @@ export type TgManagerApi = {
   syncBot(botId: string): Promise<AppState>;
   findChat(botId: string, userId: string): Promise<{ state: AppState; chatId: string }>;
   sendMessage(botId: string, chatId: string, text: string): Promise<AppState>;
+  markRead(botId: string, chatId: string): Promise<AppState>;
   getAvatar(botId: string, fileId: string): Promise<string | null>;
 };
