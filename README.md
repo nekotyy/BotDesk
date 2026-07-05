@@ -9,15 +9,16 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nekotyy/tg-bot-manager/actions/workflows/ci.yml">
-    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/nekotyy/tg-bot-manager/ci.yml?branch=main&label=CI&style=for-the-badge" />
+  <a href="https://github.com/nekotyy/BotDesk/actions">
+    <img alt="CI/CD" src="https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088ff?style=for-the-badge" />
   </a>
-  <a href="https://github.com/nekotyy/tg-bot-manager/releases/latest">
-    <img alt="Latest release" src="https://img.shields.io/github/v/release/nekotyy/tg-bot-manager?style=for-the-badge&label=Release" />
+  <a href="https://github.com/nekotyy/BotDesk/releases">
+    <img alt="Windows builds" src="https://img.shields.io/badge/builds-portable%20%2B%20installer-0b8cff?style=for-the-badge" />
   </a>
   <a href="LICENSE">
     <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" />
   </a>
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-2b3440?style=for-the-badge" />
 </p>
 
 ## О проекте
