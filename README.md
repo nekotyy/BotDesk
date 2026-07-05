@@ -62,8 +62,10 @@ BotDesk нужен для простой работы с сообщениями 
 
 | Файл | Когда использовать |
 | --- | --- |
-| `BotDesk-Portable-<version>.exe` | Нужно просто запустить приложение без установки |
-| `BotDesk-Setup-<version>.exe` | Нужна обычная установка в Windows |
+| `BotDesk-Portable-<version>-x64.exe` | Portable для 64-bit Windows |
+| `BotDesk-Portable-<version>-ia32.exe` | Portable для 32-bit Windows |
+| `BotDesk-Setup-<version>-x64.exe` | Установщик для 64-bit Windows |
+| `BotDesk-Setup-<version>-ia32.exe` | Установщик для 32-bit Windows |
 
 3. Запусти BotDesk.
 4. Создай нового бота или возьми токен существующего в [@BotFather](https://t.me/BotFather).
@@ -127,8 +129,10 @@ npm run build
 
 После сборки файлы появятся в `release/`:
 
-- `BotDesk-Portable-<version>.exe`
-- `BotDesk-Setup-<version>.exe`
+- `BotDesk-Portable-<version>-x64.exe`
+- `BotDesk-Portable-<version>-ia32.exe`
+- `BotDesk-Setup-<version>-x64.exe`
+- `BotDesk-Setup-<version>-ia32.exe`
 
 ## CI/CD и релизы
 
@@ -137,14 +141,16 @@ npm run build
 | Workflow | Что делает |
 | --- | --- |
 | `CI` | На `push` в `main` и на pull request запускает `npm ci`, typecheck, lint и web build |
-| `Release` | Собирает Windows installer и portable, затем публикует их в GitHub Release |
+| `Release` | На `push` в `main` собирает Windows installer и portable как Actions artifact; на тегах `v*` или ручном запуске ещё публикует GitHub Release |
 
-В GitHub Releases должен быть один релиз на версию, а внутри него два файла:
+В GitHub Releases должен быть один релиз на версию, а внутри него четыре файла:
 
-- `BotDesk-Portable-<version>.exe`
-- `BotDesk-Setup-<version>.exe`
+- `BotDesk-Portable-<version>-x64.exe`
+- `BotDesk-Portable-<version>-ia32.exe`
+- `BotDesk-Setup-<version>-x64.exe`
+- `BotDesk-Setup-<version>-ia32.exe`
 
-То есть не нужно создавать два отдельных релиза для portable и installer. Это два артефакта одного релиза.
+То есть не нужно создавать отдельные релизы для portable, installer или архитектур. Это четыре артефакта одного релиза.
 
 ### Автоматический релиз через тег
 

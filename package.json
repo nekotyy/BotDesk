@@ -13,7 +13,7 @@
     "dev:electron": "wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
     "icon:generate": "node scripts/generate-icon.mjs",
     "build:web": "tsc -b && vite build",
-    "build": "npm run build:web && electron-builder --win nsis portable",
+    "build": "npm run build:web && electron-builder --win nsis portable --x64 && electron-builder --win nsis portable --ia32",
     "lint": "oxlint src",
     "typecheck": "tsc -b --pretty false"
   },
@@ -33,16 +33,7 @@
     ],
     "win": {
       "icon": "assets/icon.ico",
-      "target": [
-        {
-          "target": "nsis",
-          "arch": ["x64"]
-        },
-        {
-          "target": "portable",
-          "arch": ["x64"]
-        }
-      ]
+      "target": ["nsis", "portable"]
     },
     "nsis": {
       "oneClick": false,
@@ -50,10 +41,10 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "BotDesk",
-      "artifactName": "BotDesk-Setup-${version}.${ext}"
+      "artifactName": "BotDesk-Setup-${version}-${arch}.${ext}"
     },
     "portable": {
-      "artifactName": "BotDesk-Portable-${version}.${ext}"
+      "artifactName": "BotDesk-Portable-${version}-${arch}.${ext}"
     }
   },
   "dependencies": {
