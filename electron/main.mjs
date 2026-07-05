@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron';
 import Store from 'electron-store';
 import { v4 as uuid } from 'uuid';
@@ -7,11 +8,29 @@ import { v4 as uuid } from 'uuid';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MAX_BOTS = 15;
 const API_TIMEOUT_MS = 20_000;
-const POLL_INTERVAL_MS = 5_000;
+const LONG_POLL_TIMEOUT_SECONDS = 25;
+const LONG_POLL_REQUEST_TIMEOUT_MS = LONG_POLL_TIMEOUT_SECONDS * 1000 + 15_000;
+const GET_UPDATES_LIMIT = 100;
+const MAX_DRAIN_PAGES = 50;
+const RETRY_DELAY_MS = 2_000;
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 let mainWindow;
-let pollTimer;
 const syncInFlight = new Set();
+const pollingWorkers = new Map();
+const MEDIA_MIME_BY_EXT = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  ogg: 'audio/ogg',
+  oga: 'audio/ogg',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  tgs: 'application/x-tgsticker',
+};
 
 if (!hasSingleInstanceLock) app.quit();
 
@@ -74,9 +93,20 @@ function cleanTelegramError(description = '') {
   return description || 'Telegram API вернул ошибку';
 }
 
-async function telegram(token, method, payload = {}) {
+function isWebhookActiveError(error) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  return /webhook is active|включён webhook/i.test(message);
+}
+
+function isConcurrentGetUpdatesError(error) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  return /terminated by other getUpdates|уже запущена в другом/i.test(message);
+}
+
+async function telegram(token, method, payload = {}, options = {}) {
+  const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : API_TIMEOUT_MS;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
       method: 'POST',
@@ -109,7 +139,7 @@ function normalizeChat(chat, lastMessage, previous = {}) {
     firstName: chat.first_name,
     lastName: chat.last_name,
     username: chat.username,
-    lastMessage: lastMessage?.text || lastMessage?.caption || previous.lastMessage || '',
+    lastMessage: messagePreview(lastMessage) || previous.lastMessage || '',
     lastMessageAt: lastMessage?.date ? new Date(lastMessage.date * 1000).toISOString() : previous.lastMessageAt,
     unreadCount: previous.unreadCount || 0,
   };
@@ -131,8 +161,104 @@ function addMessage(botId, chatId, message) {
   if (message.telegramId && messages.some((item) => item.telegramId === message.telegramId)) return;
   store.set('messagesByBot', {
     ...all,
-    [botId]: { ...byBot, [chatId]: [...messages, message].slice(-2000) },
+    [botId]: { ...byBot, [chatId]: [...messages, message] },
   });
+}
+
+function mediaLabel(type) {
+  const labels = {
+    photo: 'Фото',
+    sticker: 'Стикер',
+    video: 'Видео',
+    video_note: 'Кружок',
+    voice: 'Голосовое сообщение',
+  };
+  return labels[type] || 'Медиа';
+}
+
+function messagePreview(message) {
+  if (!message) return '';
+  if (message.text || message.caption) return message.text || message.caption;
+  const media = extractMessageMedia(message);
+  return media ? mediaLabel(media.type) : '';
+}
+
+function extractMessageMedia(message) {
+  const photo = message.photo?.at(-1);
+  if (photo?.file_id) {
+    return {
+      type: 'photo',
+      fileId: photo.file_id,
+      fileUniqueId: photo.file_unique_id,
+      width: photo.width,
+      height: photo.height,
+      fileSize: photo.file_size,
+    };
+  }
+  if (message.sticker?.file_id) {
+    return {
+      type: 'sticker',
+      fileId: message.sticker.file_id,
+      fileUniqueId: message.sticker.file_unique_id,
+      width: message.sticker.width,
+      height: message.sticker.height,
+      fileSize: message.sticker.file_size,
+      emoji: message.sticker.emoji,
+      setName: message.sticker.set_name,
+      mimeType: message.sticker.is_video ? 'video/webm' : message.sticker.is_animated ? 'application/x-tgsticker' : 'image/webp',
+      isAnimated: message.sticker.is_animated,
+      isVideo: message.sticker.is_video,
+    };
+  }
+  if (message.video?.file_id) {
+    return {
+      type: 'video',
+      fileId: message.video.file_id,
+      fileUniqueId: message.video.file_unique_id,
+      width: message.video.width,
+      height: message.video.height,
+      duration: message.video.duration,
+      fileName: message.video.file_name,
+      mimeType: message.video.mime_type || 'video/mp4',
+      fileSize: message.video.file_size,
+      thumbnailFileId: message.video.thumbnail?.file_id,
+    };
+  }
+  if (message.video_note?.file_id) {
+    return {
+      type: 'video_note',
+      fileId: message.video_note.file_id,
+      fileUniqueId: message.video_note.file_unique_id,
+      width: message.video_note.length,
+      height: message.video_note.length,
+      duration: message.video_note.duration,
+      mimeType: 'video/mp4',
+      fileSize: message.video_note.file_size,
+      thumbnailFileId: message.video_note.thumbnail?.file_id,
+    };
+  }
+  if (message.voice?.file_id) {
+    return {
+      type: 'voice',
+      fileId: message.voice.file_id,
+      fileUniqueId: message.voice.file_unique_id,
+      duration: message.voice.duration,
+      mimeType: message.voice.mime_type || 'audio/ogg',
+      fileSize: message.voice.file_size,
+    };
+  }
+  return undefined;
+}
+
+function safeMediaName(botId, fileId, filePath = '', mimeType = '') {
+  const extension = path.extname(filePath).slice(1) || Object.entries(MEDIA_MIME_BY_EXT).find(([, mime]) => mime === mimeType)?.[0] || 'bin';
+  const safeId = `${botId}-${fileId}`.replace(/[^a-z0-9_-]/gi, '_').slice(0, 180);
+  return `${safeId}.${extension}`;
+}
+
+function mimeFromPath(filePath, fallback = 'application/octet-stream') {
+  const extension = path.extname(filePath).slice(1).toLowerCase();
+  return MEDIA_MIME_BY_EXT[extension] || fallback;
 }
 
 async function profilePhotoFileId(token, userId) {
@@ -144,37 +270,129 @@ async function profilePhotoFileId(token, userId) {
   }
 }
 
-async function syncBot(botId) {
+async function telegramFileData(botId, fileId, fallbackMimeType) {
+  if (!fileId) return null;
+  const token = decryptToken(getBot(botId));
+  const file = await telegram(token, 'getFile', { file_id: fileId });
+  const mediaDir = path.join(app.getPath('userData'), 'media');
+  const mediaPath = path.join(mediaDir, safeMediaName(botId, fileId, file.file_path, fallbackMimeType));
+  const mimeType = fallbackMimeType || mimeFromPath(file.file_path);
+
+  try {
+    const cached = await readFile(mediaPath);
+    return `data:${mimeType};base64,${cached.toString('base64')}`;
+  } catch {
+    // Cache miss; download from Telegram and persist for the local history view.
+  }
+
+  const response = await fetch(`https://api.telegram.org/file/bot${token}/${file.file_path}`);
+  if (!response.ok) return null;
+  const headerMimeType = response.headers.get('content-type');
+  const responseMimeType = fallbackMimeType || (headerMimeType && headerMimeType !== 'application/octet-stream' ? headerMimeType : mimeType);
+  const buffer = Buffer.from(await response.arrayBuffer());
+  await mkdir(mediaDir, { recursive: true });
+  await writeFile(mediaPath, buffer);
+  return `data:${responseMimeType};base64,${buffer.toString('base64')}`;
+}
+
+async function disableWebhookIfNeeded(token) {
+  const info = await telegram(token, 'getWebhookInfo');
+  if (!info?.url) return;
+  await telegram(token, 'deleteWebhook', { drop_pending_updates: false });
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function extractUpdateMessage(update) {
+  return update.message
+    || update.edited_message
+    || update.channel_post
+    || update.edited_channel_post
+    || update.business_message
+    || update.edited_business_message
+    || update.callback_query?.message;
+}
+
+async function syncBot(botId, options = {}) {
+  const longPoll = options.longPoll === true;
+  const markSyncing = options.markSyncing !== false;
   if (syncInFlight.has(botId)) return publicState();
   syncInFlight.add(botId);
   try {
     const bot = getBot(botId);
     const token = decryptToken(bot);
-    setBot(botId, { status: 'syncing', lastError: undefined });
+    if (!bot.avatarFileId) {
+      const avatarFileId = await profilePhotoFileId(token, bot.telegramId);
+      if (avatarFileId) setBot(botId, { avatarFileId });
+    }
+    if (markSyncing) setBot(botId, { status: 'syncing', lastError: undefined });
     const offsets = store.get('updateOffsets', {});
-    const updates = await telegram(token, 'getUpdates', {
-      offset: offsets[botId] || 0,
-      limit: 100,
-      timeout: 0,
-      allowed_updates: ['message', 'edited_message', 'channel_post'],
-    });
+    const allowedUpdates = [
+      'message',
+      'edited_message',
+      'channel_post',
+      'edited_channel_post',
+      'business_message',
+      'edited_business_message',
+      'callback_query',
+    ];
+    const getUpdates = async (offset, timeoutSeconds) => telegram(token, 'getUpdates', {
+      offset,
+      limit: GET_UPDATES_LIMIT,
+      timeout: timeoutSeconds,
+      allowed_updates: allowedUpdates,
+    }, { timeoutMs: timeoutSeconds ? LONG_POLL_REQUEST_TIMEOUT_MS : API_TIMEOUT_MS });
+    const drainUpdates = async () => {
+      const batches = [];
+      let nextOffset = offsets[botId] || 0;
+      let timeoutSeconds = longPoll ? LONG_POLL_TIMEOUT_SECONDS : 0;
+
+      for (let page = 0; page < MAX_DRAIN_PAGES; page += 1) {
+        const batch = await getUpdates(nextOffset, timeoutSeconds);
+        batches.push(...batch);
+        for (const update of batch) nextOffset = Math.max(nextOffset, update.update_id + 1);
+        if (batch.length < GET_UPDATES_LIMIT) break;
+        timeoutSeconds = 0;
+      }
+
+      return batches;
+    };
+    let updates;
+    try {
+      updates = await drainUpdates();
+    } catch (error) {
+      if (isWebhookActiveError(error)) {
+        await disableWebhookIfNeeded(token);
+        updates = await drainUpdates();
+      } else if (isConcurrentGetUpdatesError(error)) {
+        // Another poll request won the race; keep the bot online and try again on next cycle.
+        setBot(botId, { status: 'online', lastSyncAt: new Date().toISOString(), lastError: undefined });
+        return publicState();
+      } else {
+        throw error;
+      }
+    }
     let maxUpdateId = offsets[botId] || 0;
     const photoQueue = [];
 
     for (const update of updates) {
       maxUpdateId = Math.max(maxUpdateId, update.update_id + 1);
-      const message = update.message || update.edited_message || update.channel_post;
+      const message = extractUpdateMessage(update);
       if (!message?.chat) continue;
       const chatId = String(message.chat.id);
       const existing = (store.get('chatsByBot', {})[botId] || []).find((item) => item.id === chatId);
       const normalized = normalizeChat(message.chat, message, existing);
       normalized.unreadCount = (existing?.unreadCount || 0) + 1;
       upsertChat(botId, normalized);
+      const media = extractMessageMedia(message);
       addMessage(botId, chatId, {
         id: `${message.chat.id}:${message.message_id}`,
         telegramId: message.message_id,
         chatId,
-        text: message.text || message.caption || '[Медиа-сообщение]',
+        text: message.text || message.caption || (media ? mediaLabel(media.type) : '[Медиа-сообщение]'),
+        media,
         direction: 'incoming',
         senderName: [message.from?.first_name, message.from?.last_name].filter(Boolean).join(' ') || message.chat.title || 'Пользователь',
         sentAt: new Date(message.date * 1000).toISOString(),
@@ -193,7 +411,7 @@ async function syncBot(botId) {
       }
     }));
 
-    store.set('updateOffsets', { ...offsets, [botId]: maxUpdateId });
+    store.set('updateOffsets', { ...store.get('updateOffsets', {}), [botId]: maxUpdateId });
     setBot(botId, { status: 'online', lastSyncAt: new Date().toISOString(), lastError: undefined });
     return publicState();
   } catch (error) {
@@ -208,36 +426,74 @@ function broadcastState() {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('state:changed', publicState());
 }
 
-async function pollAllBots() {
+function notifySyncError(botId, error) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('sync:error', {
+      botId,
+      message: error instanceof Error ? error.message : 'Ошибка синхронизации',
+    });
+  }
+}
+
+async function startPollingWorker(botId) {
+  if (pollingWorkers.has(botId)) return;
+  const worker = { stopped: false };
+  pollingWorkers.set(botId, worker);
+
+  while (!worker.stopped) {
+    try {
+      await syncBot(botId, { longPoll: true, markSyncing: false });
+      broadcastState();
+    } catch (error) {
+      notifySyncError(botId, error);
+      broadcastState();
+      await delay(RETRY_DELAY_MS);
+    }
+  }
+
+  pollingWorkers.delete(botId);
+}
+
+function stopPollingWorker(botId) {
+  const worker = pollingWorkers.get(botId);
+  if (worker) worker.stopped = true;
+}
+
+function syncPollingWorkers() {
+  const botIds = new Set(store.get('bots', []).map((bot) => bot.id));
+  for (const botId of botIds) void startPollingWorker(botId);
+  for (const botId of pollingWorkers.keys()) {
+    if (!botIds.has(botId)) stopPollingWorker(botId);
+  }
+}
+
+async function disableAllWebhooks() {
   const bots = store.get('bots', []);
   await Promise.all(bots.map(async (bot) => {
     try {
-      await syncBot(bot.id);
-    } catch (error) {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('sync:error', {
-          botId: bot.id,
-          message: error instanceof Error ? error.message : 'Ошибка синхронизации',
-        });
-      }
-    }
+      const token = decryptToken(bot);
+      await disableWebhookIfNeeded(token);
+    } catch { /* best-effort */ }
   }));
-  broadcastState();
 }
 
 function startBackgroundPolling() {
-  clearInterval(pollTimer);
-  void pollAllBots();
-  pollTimer = setInterval(() => void pollAllBots(), POLL_INTERVAL_MS);
+  syncPollingWorkers();
+}
+
+function stopBackgroundPolling() {
+  for (const botId of pollingWorkers.keys()) stopPollingWorker(botId);
 }
 
 async function createWindow() {
+  const windowIcon = path.join(__dirname, '../assets/logo.png');
   const window = new BrowserWindow({
     width: 1360,
     height: 850,
     minWidth: 900,
     minHeight: 620,
     title: 'BotDesk',
+    icon: windowIcon,
     backgroundColor: '#eaf0f7',
     autoHideMenuBar: true,
     webPreferences: {
@@ -272,13 +528,16 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     if (bots.length >= MAX_BOTS) throw new Error('Можно добавить не больше 15 ботов.');
     if (bots.some((bot) => bot.name.toLowerCase() === name.toLowerCase())) throw new Error('Бот с таким названием уже есть.');
     const me = await telegram(token, 'getMe');
+    await disableWebhookIfNeeded(token);
+    const avatarFileId = await profilePhotoFileId(token, me.id);
     if (bots.some((bot) => bot.telegramId === me.id)) throw new Error('Этот Telegram-бот уже добавлен.');
     const bot = {
       id: uuid(), name, username: me.username || '', telegramId: me.id,
-      tokenSecret: encryptToken(token), createdAt: new Date().toISOString(), status: 'online',
+      avatarFileId, tokenSecret: encryptToken(token), createdAt: new Date().toISOString(), status: 'online',
     };
     store.set('bots', [...bots, bot]);
     store.set('selectedBotId', bot.id);
+    syncPollingWorkers();
     return publicState();
   });
   ipcMain.handle('bot:remove', (_event, botId) => {
@@ -289,6 +548,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     const offsets = { ...store.get('updateOffsets', {}) };
     delete chatsByBot[botId]; delete messagesByBot[botId]; delete offsets[botId];
     store.set({ bots, chatsByBot, messagesByBot, updateOffsets: offsets, selectedBotId: bots[0]?.id || null });
+    stopPollingWorker(botId);
     return publicState();
   });
   ipcMain.handle('bot:select', (_event, botId) => {
@@ -335,8 +595,10 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     const mime = response.headers.get('content-type') || 'image/jpeg';
     return `data:${mime};base64,${Buffer.from(await response.arrayBuffer()).toString('base64')}`;
   });
+  ipcMain.handle('media:get', (_event, botId, fileId, mimeType) => telegramFileData(botId, fileId, mimeType));
 
   await createWindow();
+  await disableAllWebhooks();
   startBackgroundPolling();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
@@ -348,4 +610,4 @@ app.on('second-instance', () => {
   mainWindow.focus();
 });
 
-app.on('window-all-closed', () => { clearInterval(pollTimer); if (process.platform !== 'darwin') app.quit(); });
+app.on('window-all-closed', () => { stopBackgroundPolling(); if (process.platform !== 'darwin') app.quit(); });

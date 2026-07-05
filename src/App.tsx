@@ -1,8 +1,8 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle, ArrowLeft, Bot as BotIcon, Check, ChevronRight, CircleHelp,
-  Eye, EyeOff, Hash, Inbox, LoaderCircle, MessageCircleMore, Plus,
-  Radio, RefreshCw, Search, Send, ShieldCheck, Sparkles, Trash2,
+  Eye, EyeOff, File, Hash, Image, Inbox, LoaderCircle, MessageCircleMore, Mic, Plus,
+  Radio, RefreshCw, Search, Send, ShieldCheck, Sparkles, Trash2, Video,
   UserRoundSearch, Wifi, WifiOff, X,
 } from 'lucide-react';
 import type { AppState, Bot, Chat, Message } from './types';
@@ -30,10 +30,13 @@ function Avatar({ title, botId, fileId, size = 'md', online = false }: { title: 
   const cacheKey = botId && fileId ? `${botId}:${fileId}` : '';
   const [src, setSrc] = useState(cacheKey ? avatarCache.get(cacheKey) : undefined);
   useEffect(() => {
-    if (!botId || !fileId || avatarCache.has(`${botId}:${fileId}`)) return;
+    if (!botId || !fileId) { setSrc(undefined); return; }
+    const key = `${botId}:${fileId}`;
+    if (avatarCache.has(key)) { setSrc(avatarCache.get(key)); return; }
     let live = true;
+    setSrc(undefined);
     window.tgManager.getAvatar(botId, fileId).then((data) => {
-      if (data) { avatarCache.set(`${botId}:${fileId}`, data); if (live) setSrc(data); }
+      if (data) { avatarCache.set(key, data); if (live) setSrc(data); }
     }).catch(() => undefined);
     return () => { live = false; };
   }, [botId, fileId]);
@@ -133,7 +136,7 @@ function Onboarding({ onDone }: { onDone: (state: AppState) => void }) {
 
 function BotRail({ bots, activeId, onHome, onOpen, onAdd }: { bots: Bot[]; activeId?: string; onHome: () => void; onOpen: (bot: Bot) => void; onAdd: () => void }) {
   return <aside className="bot-rail" aria-label="Боты"><button className="rail-brand" onClick={onHome} aria-label="Все боты"><BotIcon /></button><div className="rail-divider" />
-    <div className="rail-bots">{bots.map((bot) => <button key={bot.id} className={`rail-avatar ${activeId === bot.id ? 'is-active' : ''}`} onClick={() => onOpen(bot)} aria-label={`Открыть ${bot.name}`} title={bot.name}><Avatar title={bot.name} size="sm" online={bot.status === 'online'} /></button>)}</div>
+    <div className="rail-bots">{bots.map((bot) => <button key={bot.id} className={`rail-avatar ${activeId === bot.id ? 'is-active' : ''}`} onClick={() => onOpen(bot)} aria-label={`Открыть ${bot.name}`} title={bot.name}><Avatar title={bot.name} botId={bot.id} fileId={bot.avatarFileId} size="sm" online={bot.status === 'online'} /></button>)}</div>
     {bots.length < 15 && <button className="rail-add" onClick={onAdd} aria-label="Добавить бота"><Plus /></button>}
   </aside>;
 }
@@ -153,6 +156,45 @@ function ChatRow({ chat, botId, active, onClick }: { chat: Chat; botId: string; 
   return <button className={`chat-row ${active ? 'is-active' : ''}`} onClick={onClick} aria-label={`Открыть диалог с ${chat.title}`}><Avatar title={chat.title} botId={botId} fileId={chat.avatarFileId} size="md" /><span className="chat-row__body"><span className="chat-row__line"><b>{chat.title}</b><time>{timeLabel(chat.lastMessageAt)}</time></span><span className="chat-row__line"><small>{chat.lastMessage || (chat.username ? `@${chat.username}` : `ID ${chat.telegramId}`)}</small>{chat.unreadCount > 0 && <i>{chat.unreadCount > 99 ? '99+' : chat.unreadCount}</i>}</span></span></button>;
 }
 
+function mediaLabel(type: NonNullable<Message['media']>['type']) {
+  const labels = { photo: 'Фото', sticker: 'Стикер', video: 'Видео', video_note: 'Кружок', voice: 'Голосовое сообщение' };
+  return labels[type] || 'Медиа';
+}
+
+function mediaIcon(type: NonNullable<Message['media']>['type']) {
+  if (type === 'photo') return <Image />;
+  if (type === 'video' || type === 'video_note') return <Video />;
+  if (type === 'voice') return <Mic />;
+  return <File />;
+}
+
+function MessageMediaView({ botId, message }: { botId: string; message: Message }) {
+  const media = message.media;
+  const [src, setSrc] = useState<string | null>();
+  useEffect(() => {
+    if (!media?.fileId || media.mimeType === 'application/x-tgsticker') return;
+    let live = true;
+    setSrc(undefined);
+    window.tgManager.getMedia(botId, media.fileId, media.mimeType).then((data) => {
+      if (live) setSrc(data);
+    }).catch(() => {
+      if (live) setSrc(null);
+    });
+    return () => { live = false; };
+  }, [botId, media?.fileId, media?.mimeType]);
+  if (!media) return null;
+  if (media.mimeType === 'application/x-tgsticker') {
+    return <div className="media-card media-card--placeholder"><span>{media.emoji || mediaIcon(media.type)}</span><b>Анимированный стикер</b><small>{media.setName || 'Сохранён в истории'}</small></div>;
+  }
+  if (src === undefined) return <div className="media-card media-card--loading">{mediaIcon(media.type)}<span>Загружаем {mediaLabel(media.type).toLowerCase()}</span></div>;
+  if (!src) return <div className="media-card media-card--placeholder">{mediaIcon(media.type)}<b>{mediaLabel(media.type)}</b><small>Не удалось загрузить файл</small></div>;
+  if (media.type === 'sticker' && media.mimeType?.startsWith('video/')) return <video className="message-media message-media--sticker-video" src={src} autoPlay loop muted playsInline preload="metadata" />;
+  if (media.type === 'photo' || media.type === 'sticker') return <img className={`message-media message-media--${media.type}`} src={src} alt={mediaLabel(media.type)} loading="lazy" />;
+  if (media.type === 'video' || media.type === 'video_note') return <video className={`message-media message-media--${media.type}`} src={src} controls playsInline preload="metadata" />;
+  if (media.type === 'voice') return <audio className="message-audio" src={src} controls preload="metadata" />;
+  return null;
+}
+
 function Conversation({ bot, chat, messages, syncing, onRetry, onSend }: { bot: Bot; chat?: Chat; messages: Message[]; syncing: boolean; onRetry: () => void; onSend: (text: string) => Promise<void> }) {
   const [draft, setDraft] = useState(''); const [sending, setSending] = useState(false); const messagesRef = useRef<HTMLDivElement>(null);
   useEffect(() => { const container = messagesRef.current; if (container) container.scrollTop = container.scrollHeight; }, [messages.length, chat?.id]);
@@ -162,7 +204,16 @@ function Conversation({ bot, chat, messages, syncing, onRetry, onSend }: { bot: 
   let previousDay = '';
   return <section className="conversation"><header className="conversation__header"><Avatar title={chat.title} botId={bot.id} fileId={chat.avatarFileId} size="sm" /><div><b>{chat.title}</b><small>{chat.username ? `@${chat.username} · ` : ''}ID {chat.telegramId}</small></div><span className={`live-state ${bot.status === 'online' ? 'is-online' : 'is-offline'}`}>{bot.status === 'online' ? <Radio /> : <WifiOff />}{bot.status === 'online' ? 'Входящие включены' : 'Нет соединения'}</span></header>
     {bot.lastError && <div className="connection-banner" role="alert"><AlertTriangle /><span><b>Входящие сообщения временно не поступают</b><small>{bot.lastError}</small></span><button onClick={onRetry} disabled={syncing}>{syncing ? <LoaderCircle className="spin" /> : <RefreshCw />} Повторить</button></div>}
-    <div className="messages" ref={messagesRef} aria-live="polite">{messages.length === 0 && <div className="history-start"><ShieldCheck /><span><b>Диалог подключён</b><small>Ожидаем новое сообщение пользователя. Старая история недоступна через Bot API.</small></span></div>}{messages.map((message) => { const day = dayLabel(message.sentAt); const showDay = day !== previousDay; previousDay = day; return <div key={message.id}>{showDay && <div className="day-divider"><span>{day}</span></div>}<div className={`message-line message-line--${message.direction}`}>{message.direction === 'incoming' && <Avatar title={message.senderName || chat.title} botId={bot.id} fileId={chat.avatarFileId} size="sm" />}<div className="message-stack">{message.direction === 'incoming' && <b className="message-sender">{message.senderName || chat.title}</b>}<div className="message-bubble"><p>{message.text}</p><span>{timeLabel(message.sentAt)} {message.direction === 'outgoing' && <Check aria-label="Отправлено" />}</span></div></div></div></div>; })}</div>
+    <div className="messages" ref={messagesRef} aria-live="polite">
+      {messages.length === 0 && <div className="history-start"><ShieldCheck /><span><b>Диалог подключён</b><small>Ожидаем новое сообщение пользователя. Старая история недоступна через Bot API.</small></span></div>}
+      {messages.map((message) => {
+        const day = dayLabel(message.sentAt);
+        const showDay = day !== previousDay;
+        const showText = !message.media || message.text !== mediaLabel(message.media.type);
+        previousDay = day;
+        return <div key={message.id}>{showDay && <div className="day-divider"><span>{day}</span></div>}<div className={`message-line message-line--${message.direction}`}>{message.direction === 'incoming' && <Avatar title={message.senderName || chat.title} botId={bot.id} fileId={chat.avatarFileId} size="sm" />}<div className="message-stack">{message.direction === 'incoming' && <b className="message-sender">{message.senderName || chat.title}</b>}<div className={`message-bubble ${message.media ? 'message-bubble--media' : ''}`}><MessageMediaView botId={bot.id} message={message} />{showText && <p>{message.text}</p>}<span>{timeLabel(message.sentAt)} {message.direction === 'outgoing' && <Check aria-label="Отправлено" />}</span></div></div></div></div>;
+      })}
+    </div>
     <footer className="composer"><textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={keyDown} placeholder={`Сообщение для ${chat.firstName || chat.title}`} rows={1} maxLength={4096} aria-label="Текст сообщения" /><span className="composer__count">{draft.length > 3800 ? `${draft.length}/4096` : ''}</span><button onClick={() => void send()} disabled={!draft.trim() || sending} aria-label="Отправить сообщение">{sending ? <LoaderCircle className="spin" /> : <Send />}</button></footer>
   </section>;
 }
@@ -178,7 +229,7 @@ function Workspace({ state, bot, onState, onHome, onAdd, notify }: { state: AppS
   const find = async (event: FormEvent) => { event.preventDefault(); setFinding(true); try { const result = await window.tgManager.findChat(bot.id, userId); onState(result.state); setActiveChatId(result.chatId); setShowId(false); setUserId(''); notify('Диалог найден', 'success'); } catch (e) { notify(e instanceof Error ? e.message : 'Чат не найден', 'error'); } finally { setFinding(false); } };
   const send = async (text: string) => { if (!activeChatId) return; try { onState(await window.tgManager.sendMessage(bot.id, activeChatId, text)); } catch (e) { notify(e instanceof Error ? e.message : 'Не удалось отправить сообщение', 'error'); throw e; } };
   return <div className="app-shell"><BotRail bots={state.bots} activeId={bot.id} onHome={onHome} onOpen={async (next) => { onState(await window.tgManager.selectBot(next.id)); setActiveChatId(undefined); }} onAdd={onAdd} />
-    <aside className="chat-panel"><header className="chat-panel__header"><button className="mobile-back" onClick={onHome} aria-label="Назад к ботам"><ArrowLeft /></button><div className="bot-heading"><Avatar title={bot.name} size="sm" online={bot.status === 'online'} /><span><b>{bot.name}</b><small>@{bot.username}</small></span></div><button className="icon-button" onClick={() => void sync()} aria-label="Синхронизировать" disabled={syncing}><RefreshCw className={syncing ? 'spin' : ''} /></button></header>
+    <aside className="chat-panel"><header className="chat-panel__header"><button className="mobile-back" onClick={onHome} aria-label="Назад к ботам"><ArrowLeft /></button><div className="bot-heading"><Avatar title={bot.name} botId={bot.id} fileId={bot.avatarFileId} size="sm" online={bot.status === 'online'} /><span><b>{bot.name}</b><small>@{bot.username}</small></span></div><button className="icon-button" onClick={() => void sync()} aria-label="Синхронизировать" disabled={syncing}><RefreshCw className={syncing ? 'spin' : ''} /></button></header>
       <div className={`sync-strip sync-strip--${bot.status}`}>{bot.status === 'online' ? <Wifi /> : bot.status === 'syncing' ? <LoaderCircle className="spin" /> : <WifiOff />}<span><b>{bot.status === 'online' ? 'Входящие активны' : bot.status === 'syncing' ? 'Получаем сообщения…' : 'Входящие остановлены'}</b><small>{bot.lastSyncAt ? <>Последняя проверка {timeLabel(bot.lastSyncAt)}</> : 'Проверяем соединение'}</small></span></div>
       <div className="chat-tools"><div className="search-box"><Search /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Имя, username или ID" aria-label="Поиск диалогов" />{query && <button onClick={() => setQuery('')} aria-label="Очистить поиск"><X /></button>}</div><button className="id-button" onClick={() => setShowId(true)}><UserRoundSearch /> Открыть по ID</button></div>
       <div className="chat-list">{filtered.length ? filtered.map((chat) => <ChatRow key={chat.id} chat={chat} botId={bot.id} active={chat.id === activeChatId} onClick={() => void openChat(chat)} />) : <div className="empty-list"><span><Inbox /></span><b>{query ? 'Ничего не найдено' : 'Пока нет диалогов'}</b><p>{query ? 'Попробуйте другой запрос.' : 'Нажмите «Обновить» или откройте чат по ID.'}</p></div>}</div>
@@ -194,7 +245,13 @@ export default function App() {
     if (!window.tgManager) { setLoading(false); return; }
     window.tgManager.getState().then(setState).catch((e) => setToast({ text: e instanceof Error ? e.message : 'Не удалось загрузить данные', type: 'error' })).finally(() => setLoading(false));
     const stopState = window.tgManager.onStateChanged(setState);
-    return stopState;
+    const stopSyncErrors = window.tgManager.onSyncError((payload) => {
+      setToast({ text: payload.message || 'Ошибка синхронизации', type: 'error' });
+    });
+    return () => {
+      stopState();
+      stopSyncErrors();
+    };
   }, []);
   useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(undefined), 4200); return () => window.clearTimeout(timer); }, [toast]);
   const notify = (text: string, type: 'error' | 'success' = 'success') => setToast({ text, type });

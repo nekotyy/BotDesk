@@ -1,8 +1,9 @@
 node_modules/
 dist/
 release/
+.tmp-sctb/
+media/
 *.log
 .DS_Store
 .env*
 !.env.example
-

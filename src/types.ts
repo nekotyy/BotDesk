@@ -31,10 +31,28 @@ export type Message = {
   telegramId?: number;
   chatId: string;
   text: string;
+  media?: MessageMedia;
   direction: 'incoming' | 'outgoing';
   senderName: string;
   sentAt: string;
   status: 'sending' | 'sent' | 'failed';
+};
+
+export type MessageMedia = {
+  type: 'photo' | 'sticker' | 'video' | 'video_note' | 'voice';
+  fileId: string;
+  fileUniqueId?: string;
+  fileName?: string;
+  mimeType?: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+  fileSize?: number;
+  emoji?: string;
+  setName?: string;
+  isAnimated?: boolean;
+  isVideo?: boolean;
+  thumbnailFileId?: string;
 };
 
 export type AppState = {
@@ -56,6 +74,7 @@ export type TgManagerApi = {
   sendMessage(botId: string, chatId: string, text: string): Promise<AppState>;
   markRead(botId: string, chatId: string): Promise<AppState>;
   getAvatar(botId: string, fileId: string): Promise<string | null>;
+  getMedia(botId: string, fileId: string, mimeType?: string): Promise<string | null>;
   onStateChanged(callback: (state: AppState) => void): () => void;
   onSyncError(callback: (payload: { botId: string; message: string }) => void): () => void;
 };

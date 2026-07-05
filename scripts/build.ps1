@@ -38,6 +38,7 @@ if (Test-Path -LiteralPath $stage) {
 New-Item -ItemType Directory -Path $stage | Out-Null
 Copy-Item -LiteralPath (Join-Path $project 'dist') -Destination $stage -Recurse
 Copy-Item -LiteralPath (Join-Path $project 'electron') -Destination $stage -Recurse
+Copy-Item -LiteralPath (Join-Path $project 'assets') -Destination $stage -Recurse
 Copy-Item -LiteralPath (Join-Path $project 'package.json') -Destination $stage
 Copy-Item -LiteralPath (Join-Path $project 'package-lock.json') -Destination $stage
 

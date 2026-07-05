@@ -5,19 +5,22 @@
   "type": "module",
   "main": "electron/main.mjs",
   "description": "Desktop manager for Telegram bots and their conversations",
+  "license": "MIT",
   "author": "nekotyy",
   "scripts": {
     "dev": "concurrently -k \"npm:dev:web\" \"npm:dev:electron\"",
     "dev:web": "vite --host 127.0.0.1",
     "dev:electron": "wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
+    "icon:generate": "node scripts/generate-icon.mjs",
     "build:web": "tsc -b && vite build",
-    "build": "npm run build:web && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1",
+    "build": "npm run build:web && electron-builder --win nsis portable",
     "lint": "oxlint src",
     "typecheck": "tsc -b --pretty false"
   },
   "build": {
     "appId": "app.botdesk.desktop",
     "productName": "BotDesk",
+    "icon": "assets/icon.ico",
     "asar": true,
     "directories": {
       "output": "release"
@@ -25,17 +28,31 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "assets/**/*",
       "package.json"
     ],
     "win": {
+      "icon": "assets/icon.ico",
       "target": [
         {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
           "target": "portable",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
         }
-      ],
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "BotDesk",
+      "artifactName": "BotDesk-Setup-${version}.${ext}"
+    },
+    "portable": {
       "artifactName": "BotDesk-Portable-${version}.${ext}"
     }
   },
@@ -56,6 +73,7 @@
     "electron": "^39.2.0",
     "electron-builder": "^26.0.12",
     "oxlint": "^1.32.0",
+    "png-to-ico": "^3.0.1",
     "typescript": "^5.9.3",
     "vite": "^7.2.2",
     "wait-on": "^9.0.3"
