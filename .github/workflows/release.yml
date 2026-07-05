@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - dev
     tags:
       - 'v*'
   workflow_dispatch:
@@ -58,14 +59,49 @@ jobs:
             release/BotDesk-Setup-*.exe
           if-no-files-found: error
 
+      - name: Prepare release metadata
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            "RELEASE_TAG=v${{ inputs.version }}" >> $env:GITHUB_ENV
+            "RELEASE_NAME=BotDesk v${{ inputs.version }}" >> $env:GITHUB_ENV
+            "RELEASE_PRERELEASE=false" >> $env:GITHUB_ENV
+            "RELEASE_MAKE_LATEST=true" >> $env:GITHUB_ENV
+          } elseif ("${{ startsWith(github.ref, 'refs/tags/') }}" -eq "true") {
+            "RELEASE_TAG=${{ github.ref_name }}" >> $env:GITHUB_ENV
+            "RELEASE_NAME=BotDesk ${{ github.ref_name }}" >> $env:GITHUB_ENV
+            "RELEASE_PRERELEASE=false" >> $env:GITHUB_ENV
+            "RELEASE_MAKE_LATEST=true" >> $env:GITHUB_ENV
+          } elseif ("${{ github.ref_name }}" -eq "main") {
+            "RELEASE_TAG=latest" >> $env:GITHUB_ENV
+            "RELEASE_NAME=BotDesk latest" >> $env:GITHUB_ENV
+            "RELEASE_PRERELEASE=false" >> $env:GITHUB_ENV
+            "RELEASE_MAKE_LATEST=false" >> $env:GITHUB_ENV
+          } else {
+            "RELEASE_TAG=dev-latest" >> $env:GITHUB_ENV
+            "RELEASE_NAME=BotDesk dev latest" >> $env:GITHUB_ENV
+            "RELEASE_PRERELEASE=true" >> $env:GITHUB_ENV
+            "RELEASE_MAKE_LATEST=false" >> $env:GITHUB_ENV
+          }
+
+      - name: Move rolling release tag
+        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f $env:RELEASE_TAG $env:GITHUB_SHA
+          git push origin "refs/tags/$env:RELEASE_TAG" --force
+
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
-          name: BotDesk ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_NAME }}
+          target_commitish: ${{ github.sha }}
           draft: false
-          prerelease: false
+          prerelease: ${{ env.RELEASE_PRERELEASE }}
+          make_latest: ${{ env.RELEASE_MAKE_LATEST }}
           files: |
             release/BotDesk-Portable-*.exe
             release/BotDesk-Setup-*.exe

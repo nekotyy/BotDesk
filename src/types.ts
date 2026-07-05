@@ -74,7 +74,11 @@ export type TgManagerApi = {
   sendMessage(botId: string, chatId: string, text: string): Promise<AppState>;
   markRead(botId: string, chatId: string): Promise<AppState>;
   getAvatar(botId: string, fileId: string): Promise<string | null>;
-  getMedia(botId: string, fileId: string, mimeType?: string): Promise<string | null>;
+  getMedia(botId: string, fileId: string, mimeType?: string): Promise<MediaPayload | null>;
   onStateChanged(callback: (state: AppState) => void): () => void;
   onSyncError(callback: (payload: { botId: string; message: string }) => void): () => void;
 };
+
+export type MediaPayload =
+  | { kind: 'image' | 'video' | 'audio'; mimeType: string; dataUrl: string }
+  | { kind: 'lottie'; mimeType: 'application/json'; json: unknown };
