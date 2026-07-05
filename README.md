@@ -141,9 +141,18 @@ npm run build
 | Workflow | Что делает |
 | --- | --- |
 | `CI` | На `push` в `main` и на pull request запускает `npm ci`, typecheck, lint и web build |
-| `Release` | На `push` в `main` собирает Windows installer и portable как Actions artifact; на тегах `v*` или ручном запуске ещё публикует GitHub Release |
+| `Release` | Собирает Windows installer и portable, загружает Actions artifact и публикует GitHub Release |
 
-В GitHub Releases должен быть один релиз на версию, а внутри него четыре файла:
+Автопубликация работает так:
+
+| Событие | Что публикуется |
+| --- | --- |
+| Push в `dev` | Pre-release `dev-latest` |
+| Push в `main` | Release `latest` |
+| Push тега `v*` | Версионный release, например `v1.1.0` |
+| Ручной запуск `Release` | Версионный release по введённой версии |
+
+В каждом GitHub Release лежит четыре файла:
 
 - `BotDesk-Portable-<version>-x64.exe`
 - `BotDesk-Portable-<version>-ia32.exe`
@@ -152,7 +161,25 @@ npm run build
 
 То есть не нужно создавать отдельные релизы для portable, installer или архитектур. Это четыре артефакта одного релиза.
 
-### Автоматический релиз через тег
+### Автоматический релиз через ветку
+
+Для dev-сборки достаточно запушить изменения в `dev`:
+
+```powershell
+git push origin dev
+```
+
+GitHub Actions сам обновит pre-release `dev-latest`.
+
+Для latest-сборки достаточно запушить изменения в `main`:
+
+```powershell
+git push origin main
+```
+
+GitHub Actions сам обновит release `latest`.
+
+### Версионный релиз через тег
 
 ```powershell
 git tag v1.1.0
