@@ -1,4 +1,4 @@
-﻿import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle, ArrowLeft, Bot as BotIcon, Check, ChevronRight, CircleHelp,
   Eye, EyeOff, File, Hash, Image, Inbox, LoaderCircle, MessageCircleMore, Mic, Plus,
@@ -11,14 +11,14 @@ import './App.css';
 const emptyState: AppState = { bots: [], selectedBotId: null, chatsByBot: {}, messagesByBot: {} };
 const avatarCache = new Map<string, string>();
 const demoBot: Bot = { id: 'demo-bot', name: 'Support Bot', username: 'support_demo_bot', telegramId: 100001, createdAt: new Date().toISOString(), lastSyncAt: new Date().toISOString(), status: 'online' };
-const demoChat: Chat = { id: 'demo-chat', telegramId: 6605474392, type: 'private', title: 'РђРЅРЅР° Р’РѕР»РєРѕРІР°', firstName: 'РђРЅРЅР°', lastName: 'Р’РѕР»РєРѕРІР°', username: 'anna_volkova', lastMessage: 'Р”Р°, С‚РµРїРµСЂСЊ РІСЃС‘ СЂР°Р±РѕС‚Р°РµС‚. РЎРїР°СЃРёР±Рѕ!', lastMessageAt: new Date().toISOString(), unreadCount: 0 };
+const demoChat: Chat = { id: 'demo-chat', telegramId: 6605474392, type: 'private', title: 'Анна Волкова', firstName: 'Анна', lastName: 'Волкова', username: 'anna_volkova', lastMessage: 'Да, теперь всё работает. Спасибо!', lastMessageAt: new Date().toISOString(), unreadCount: 0 };
 const demoState: AppState = {
   bots: [demoBot], selectedBotId: demoBot.id,
   chatsByBot: { [demoBot.id]: [demoChat] },
   messagesByBot: { [demoBot.id]: { [demoChat.id]: [
-    { id: 'demo-1', chatId: demoChat.id, text: 'Р—РґСЂР°РІСЃС‚РІСѓР№С‚Рµ! РџРѕРґСЃРєР°Р¶РёС‚Рµ, РєР°Рє РїРѕРґРєР»СЋС‡РёС‚СЊ СѓРІРµРґРѕРјР»РµРЅРёСЏ?', direction: 'incoming', senderName: 'РђРЅРЅР° Р’РѕР»РєРѕРІР°', sentAt: new Date(Date.now() - 180_000).toISOString(), status: 'sent' },
-    { id: 'demo-2', chatId: demoChat.id, text: 'РћС‚РєСЂРѕР№С‚Рµ РЅР°СЃС‚СЂРѕР№РєРё Р±РѕС‚Р° Рё РІРєР»СЋС‡РёС‚Рµ РїСѓРЅРєС‚ В«РќРѕРІС‹Рµ СЃРѕРѕР±С‰РµРЅРёСЏВ».', direction: 'outgoing', senderName: demoBot.name, sentAt: new Date(Date.now() - 120_000).toISOString(), status: 'sent' },
-    { id: 'demo-3', chatId: demoChat.id, text: 'Р”Р°, С‚РµРїРµСЂСЊ РІСЃС‘ СЂР°Р±РѕС‚Р°РµС‚. РЎРїР°СЃРёР±Рѕ!', direction: 'incoming', senderName: 'РђРЅРЅР° Р’РѕР»РєРѕРІР°', sentAt: new Date().toISOString(), status: 'sent' },
+    { id: 'demo-1', chatId: demoChat.id, text: 'Здравствуйте! Подскажите, как подключить уведомления?', direction: 'incoming', senderName: 'Анна Волкова', sentAt: new Date(Date.now() - 180_000).toISOString(), status: 'sent' },
+    { id: 'demo-2', chatId: demoChat.id, text: 'Откройте настройки бота и включите пункт «Новые сообщения».', direction: 'outgoing', senderName: demoBot.name, sentAt: new Date(Date.now() - 120_000).toISOString(), status: 'sent' },
+    { id: 'demo-3', chatId: demoChat.id, text: 'Да, теперь всё работает. Спасибо!', direction: 'incoming', senderName: 'Анна Волкова', sentAt: new Date().toISOString(), status: 'sent' },
   ] } },
 };
 
@@ -41,9 +41,9 @@ function Avatar({ title, botId, fileId, size = 'md', online = false }: { title: 
     return () => { live = false; };
   }, [botId, fileId]);
   return (
-    <span className={`avatar avatar--${size}`} aria-label={`РђРІР°С‚Р°СЂ: ${title}`}>
+    <span className={`avatar avatar--${size}`} aria-label={`Аватар: ${title}`}>
       {src ? <img src={src} alt="" /> : <span>{initials(title)}</span>}
-      {online && <i className="avatar__status" title="Р‘РѕС‚ РґРѕСЃС‚СѓРїРµРЅ" />}
+      {online && <i className="avatar__status" title="Бот доступен" />}
     </span>
   );
 }
@@ -57,8 +57,8 @@ function timeLabel(iso?: string) {
 
 function dayLabel(iso: string) {
   const date = new Date(iso); const today = new Date(); const yesterday = new Date(); yesterday.setDate(today.getDate() - 1);
-  if (date.toDateString() === today.toDateString()) return 'РЎРµРіРѕРґРЅСЏ';
-  if (date.toDateString() === yesterday.toDateString()) return 'Р’С‡РµСЂР°';
+  if (date.toDateString() === today.toDateString()) return 'Сегодня';
+  if (date.toDateString() === yesterday.toDateString()) return 'Вчера';
   return new Intl.DateTimeFormat('ru', { day: 'numeric', month: 'long', year: date.getFullYear() === today.getFullYear() ? undefined : 'numeric' }).format(date);
 }
 
@@ -73,31 +73,31 @@ function AddBotForm({ onboarding = false, onDone, onCancel }: { onboarding?: boo
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setError(''); setBusy(true);
     try {
-      if (!window.tgManager) throw new Error('РћС‚РєСЂРѕР№С‚Рµ BotDesk РєР°Рє desktop-РїСЂРёР»РѕР¶РµРЅРёРµ, Р° РЅРµ РєР°Рє СЃС‚СЂР°РЅРёС†Сѓ РІ Р±СЂР°СѓР·РµСЂРµ.');
+      if (!window.tgManager) throw new Error('Откройте BotDesk как desktop-приложение, а не как страницу в браузере.');
       onDone(await window.tgManager.addBot({ name, token }));
     }
-    catch (e) { setError(e instanceof Error ? e.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ РґРѕР±Р°РІРёС‚СЊ Р±РѕС‚Р°'); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Не удалось добавить бота'); }
     finally { setBusy(false); }
   };
   return (
     <form className={`add-form ${onboarding ? 'add-form--onboarding' : ''}`} onSubmit={submit}>
       <div className="field">
-        <label htmlFor="bot-name">РќР°Р·РІР°РЅРёРµ РІ BotDesk</label>
-        <input id="bot-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="РќР°РїСЂРёРјРµСЂ, Р‘РѕС‚ РїРѕРґРґРµСЂР¶РєРё" maxLength={40} autoFocus />
-        <small>Р•РіРѕ СѓРІРёРґРёС‚Рµ С‚РѕР»СЊРєРѕ РІС‹ вЂ” РјРѕР¶РЅРѕ РїРµСЂРµРёРјРµРЅРѕРІР°С‚СЊ РєР°Рє СѓРґРѕР±РЅРѕ.</small>
+        <label htmlFor="bot-name">Название в BotDesk</label>
+        <input id="bot-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Бот поддержки" maxLength={40} autoFocus />
+        <small>Его увидите только вы — можно переименовать как удобно.</small>
       </div>
       <div className="field">
-        <label htmlFor="bot-token">РўРѕРєРµРЅ BotFather</label>
+        <label htmlFor="bot-token">Токен BotFather</label>
         <div className="input-with-action">
-          <input id="bot-token" type={showToken ? 'text' : 'password'} value={token} onChange={(e) => setToken(e.target.value)} placeholder="123456789:AAвЂ¦" autoComplete="off" spellCheck={false} />
-          <button type="button" className="icon-button icon-button--inside" onClick={() => setShowToken((v) => !v)} aria-label={showToken ? 'РЎРєСЂС‹С‚СЊ С‚РѕРєРµРЅ' : 'РџРѕРєР°Р·Р°С‚СЊ С‚РѕРєРµРЅ'}>{showToken ? <EyeOff /> : <Eye />}</button>
+          <input id="bot-token" type={showToken ? 'text' : 'password'} value={token} onChange={(e) => setToken(e.target.value)} placeholder="123456789:AA…" autoComplete="off" spellCheck={false} />
+          <button type="button" className="icon-button icon-button--inside" onClick={() => setShowToken((v) => !v)} aria-label={showToken ? 'Скрыть токен' : 'Показать токен'}>{showToken ? <EyeOff /> : <Eye />}</button>
         </div>
-        <small className="secure-note"><ShieldCheck /> РўРѕРєРµРЅ С…СЂР°РЅРёС‚СЃСЏ Р»РѕРєР°Р»СЊРЅРѕ Рё С€РёС„СЂСѓРµС‚СЃСЏ СЃСЂРµРґСЃС‚РІР°РјРё Windows.</small>
+        <small className="secure-note"><ShieldCheck /> Токен хранится локально и шифруется средствами Windows.</small>
       </div>
       {error && <div className="form-error" role="alert">{error}</div>}
       <div className="form-actions">
-        {onCancel && <button type="button" className="button button--quiet" onClick={onCancel}>РћС‚РјРµРЅР°</button>}
-        <button className="button button--primary" disabled={busy || !name.trim() || !token.trim()}>{busy ? <><LoaderCircle className="spin" /> РџСЂРѕРІРµСЂСЏСЋвЂ¦</> : <>{onboarding ? 'РќР°С‡Р°С‚СЊ СЂР°Р±РѕС‚Сѓ' : 'Р”РѕР±Р°РІРёС‚СЊ Р±РѕС‚Р°'} <ChevronRight /></>}</button>
+        {onCancel && <button type="button" className="button button--quiet" onClick={onCancel}>Отмена</button>}
+        <button className="button button--primary" disabled={busy || !name.trim() || !token.trim()}>{busy ? <><LoaderCircle className="spin" /> Проверяю…</> : <>{onboarding ? 'Начать работу' : 'Добавить бота'} <ChevronRight /></>}</button>
       </div>
     </form>
   );
@@ -109,25 +109,25 @@ function Onboarding({ onDone }: { onDone: (state: AppState) => void }) {
       <section className="onboarding__story">
         <div className="brand brand--light"><span className="brand__mark"><BotIcon /></span><span>BotDesk</span></div>
         <div className="onboarding__copy">
-          <span className="eyebrow"><Sparkles /> Р’СЃРµ РґРёР°Р»РѕРіРё РІ РѕРґРЅРѕРј РѕРєРЅРµ</span>
-          <h1>Р’Р°С€Рё Telegram-Р±РѕС‚С‹.<br />РЎРїРѕРєРѕР№РЅРѕ Рё РїРѕ РїРѕР»РѕС‡РєР°Рј.</h1>
-          <p>РћС‚РІРµС‡Р°Р№С‚Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј РѕС‚ РёРјРµРЅРё Р±РѕС‚Р°, РЅР°С…РѕРґРёС‚Рµ РЅСѓР¶РЅС‹Р№ С‡Р°С‚ РїРѕ ID Рё РЅРµ С‚РµСЂСЏР№С‚Рµ РёСЃС‚РѕСЂРёСЋ РїРµСЂРµРїРёСЃРєРё.</p>
-          <div className="feature-row"><span><Check /> Р”Рѕ 15 Р±РѕС‚РѕРІ</span><span><Check /> Р›РѕРєР°Р»СЊРЅР°СЏ РёСЃС‚РѕСЂРёСЏ</span><span><Check /> Р‘РµР· РѕР±Р»Р°РєР°</span></div>
+          <span className="eyebrow"><Sparkles /> Все диалоги в одном окне</span>
+          <h1>Ваши Telegram-боты.<br />Спокойно и по полочкам.</h1>
+          <p>Отвечайте пользователям от имени бота, находите нужный чат по ID и не теряйте историю переписки.</p>
+          <div className="feature-row"><span><Check /> До 15 ботов</span><span><Check /> Локальная история</span><span><Check /> Без облака</span></div>
         </div>
         <div className="onboarding__visual" aria-hidden="true">
-          <div className="visual-card visual-card--one"><Avatar title="РђРЅРЅР° Р’РѕР»РєРѕРІР°" size="md" /><span><b>РђРЅРЅР° Р’РѕР»РєРѕРІР°</b><small>РЎРїР°СЃРёР±Рѕ! Р’СЃС‘ РїРѕР»СѓС‡РёР»РѕСЃСЊ</small></span></div>
-          <div className="visual-card visual-card--two"><span className="mini-bot"><BotIcon /></span><span><b>Support Bot</b><small>РћС‚РІРµС‡Р°РµС‚ СЃРµР№С‡Р°СЃ</small></span></div>
-          <div className="visual-bubble">Р Р°Рґ РїРѕРјРѕС‡СЊ! Р•СЃР»Рё С‡С‚Рѕ вЂ” СЏ СЂСЏРґРѕРј.</div>
+          <div className="visual-card visual-card--one"><Avatar title="Анна Волкова" size="md" /><span><b>Анна Волкова</b><small>Спасибо! Всё получилось</small></span></div>
+          <div className="visual-card visual-card--two"><span className="mini-bot"><BotIcon /></span><span><b>Support Bot</b><small>Отвечает сейчас</small></span></div>
+          <div className="visual-bubble">Рад помочь! Если что — я рядом.</div>
         </div>
-        <small className="onboarding__foot">BotDesk РЅРµ РїРµСЂРµРґР°С‘С‚ С‚РѕРєРµРЅС‹ Рё РїРµСЂРµРїРёСЃРєСѓ С‚СЂРµС‚СЊРёРј Р»РёС†Р°Рј</small>
+        <small className="onboarding__foot">BotDesk не передаёт токены и переписку третьим лицам</small>
       </section>
       <section className="onboarding__setup">
         <div className="setup-card">
-          <span className="step-pill">РЁР°Рі 1 РёР· 1</span>
-          <h2>РџРѕРґРєР»СЋС‡РёС‚Рµ РїРµСЂРІРѕРіРѕ Р±РѕС‚Р°</h2>
-          <p className="muted">Р’РѕР·СЊРјРёС‚Рµ С‚РѕРєРµРЅ Сѓ <b>@BotFather</b>. РњС‹ РїСЂРѕРІРµСЂРёРј РµРіРѕ РїРµСЂРµРґ СЃРѕС…СЂР°РЅРµРЅРёРµРј.</p>
+          <span className="step-pill">Шаг 1 из 1</span>
+          <h2>Подключите первого бота</h2>
+          <p className="muted">Возьмите токен у <b>@BotFather</b>. Мы проверим его перед сохранением.</p>
           <AddBotForm onboarding onDone={onDone} />
-          <a className="help-link" href="https://t.me/BotFather" target="_blank" rel="noreferrer"><CircleHelp /> Р“РґРµ РЅР°Р№С‚Рё С‚РѕРєРµРЅ?</a>
+          <a className="help-link" href="https://t.me/BotFather" target="_blank" rel="noreferrer"><CircleHelp /> Где найти токен?</a>
         </div>
       </section>
     </main>
@@ -135,30 +135,30 @@ function Onboarding({ onDone }: { onDone: (state: AppState) => void }) {
 }
 
 function BotRail({ bots, activeId, onHome, onOpen, onAdd }: { bots: Bot[]; activeId?: string; onHome: () => void; onOpen: (bot: Bot) => void; onAdd: () => void }) {
-  return <aside className="bot-rail" aria-label="Р‘РѕС‚С‹"><button className="rail-brand" onClick={onHome} aria-label="Р’СЃРµ Р±РѕС‚С‹"><BotIcon /></button><div className="rail-divider" />
-    <div className="rail-bots">{bots.map((bot) => <button key={bot.id} className={`rail-avatar ${activeId === bot.id ? 'is-active' : ''}`} onClick={() => onOpen(bot)} aria-label={`РћС‚РєСЂС‹С‚СЊ ${bot.name}`} title={bot.name}><Avatar title={bot.name} botId={bot.id} fileId={bot.avatarFileId} size="sm" online={bot.status === 'online'} /></button>)}</div>
-    {bots.length < 15 && <button className="rail-add" onClick={onAdd} aria-label="Р”РѕР±Р°РІРёС‚СЊ Р±РѕС‚Р°"><Plus /></button>}
+  return <aside className="bot-rail" aria-label="Боты"><button className="rail-brand" onClick={onHome} aria-label="Все боты"><BotIcon /></button><div className="rail-divider" />
+    <div className="rail-bots">{bots.map((bot) => <button key={bot.id} className={`rail-avatar ${activeId === bot.id ? 'is-active' : ''}`} onClick={() => onOpen(bot)} aria-label={`Открыть ${bot.name}`} title={bot.name}><Avatar title={bot.name} botId={bot.id} fileId={bot.avatarFileId} size="sm" online={bot.status === 'online'} /></button>)}</div>
+    {bots.length < 15 && <button className="rail-add" onClick={onAdd} aria-label="Добавить бота"><Plus /></button>}
   </aside>;
 }
 
 function BotHub({ state, onOpen, onAdd, onRemove }: { state: AppState; onOpen: (bot: Bot) => void; onAdd: () => void; onRemove: (bot: Bot) => void }) {
   return <div className="app-shell"><BotRail bots={state.bots} onHome={() => undefined} onOpen={onOpen} onAdd={onAdd} /><main className="hub">
-    <header className="hub__header"><div><span className="eyebrow eyebrow--blue">Р Р°Р±РѕС‡РµРµ РїСЂРѕСЃС‚СЂР°РЅСЃС‚РІРѕ</span><h1>Р’С‹Р±РµСЂРёС‚Рµ Р±РѕС‚Р°</h1><p>РћС‚РєСЂРѕР№С‚Рµ РІС…РѕРґСЏС‰РёРµ Рё РѕС‚РІРµС‡Р°Р№С‚Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј РѕС‚ РµРіРѕ РёРјРµРЅРё.</p></div><button className="button button--primary" onClick={onAdd} disabled={state.bots.length >= 15}><Plus /> Р”РѕР±Р°РІРёС‚СЊ Р±РѕС‚Р°</button></header>
-    <div className="hub__summary"><div><BotIcon /><span><b>{state.bots.length}</b><small>РїРѕРґРєР»СЋС‡РµРЅРѕ РёР· 15</small></span></div><div><MessageCircleMore /><span><b>{Object.values(state.chatsByBot).reduce((sum, chats) => sum + chats.length, 0)}</b><small>РґРёР°Р»РѕРіРѕРІ СЃРѕС…СЂР°РЅРµРЅРѕ</small></span></div></div>
-    <section className="bot-grid" aria-label="РџРѕРґРєР»СЋС‡С‘РЅРЅС‹Рµ Р±РѕС‚С‹">{state.bots.map((bot) => {
+    <header className="hub__header"><div><span className="eyebrow eyebrow--blue">Рабочее пространство</span><h1>Выберите бота</h1><p>Откройте входящие и отвечайте пользователям от его имени.</p></div><button className="button button--primary" onClick={onAdd} disabled={state.bots.length >= 15}><Plus /> Добавить бота</button></header>
+    <div className="hub__summary"><div><BotIcon /><span><b>{state.bots.length}</b><small>подключено из 15</small></span></div><div><MessageCircleMore /><span><b>{Object.values(state.chatsByBot).reduce((sum, chats) => sum + chats.length, 0)}</b><small>диалогов сохранено</small></span></div></div>
+    <section className="bot-grid" aria-label="Подключённые боты">{state.bots.map((bot) => {
       const chats = state.chatsByBot[bot.id] || []; const unread = chats.reduce((sum, chat) => sum + chat.unreadCount, 0);
-      return <article className="bot-card" key={bot.id}><div className="bot-card__top"><Avatar title={bot.name} botId={bot.id} fileId={bot.avatarFileId} size="lg" online={bot.status === 'online'} /><div className="bot-card__actions"><span className={`status-chip status-chip--${bot.status}`}>{bot.status === 'online' ? <Wifi /> : bot.status === 'syncing' ? <RefreshCw className="spin" /> : <WifiOff />}{bot.status === 'online' ? 'РќР° СЃРІСЏР·Рё' : bot.status === 'syncing' ? 'РћР±РЅРѕРІР»РµРЅРёРµ' : 'РќРµС‚ РІС…РѕРґСЏС‰РёС…'}</span><button className="icon-button danger-on-hover" onClick={() => onRemove(bot)} aria-label={`РЈРґР°Р»РёС‚СЊ ${bot.name}`}><Trash2 /></button></div></div><h2>{bot.name}</h2><p>@{bot.username || 'Р±РµР· username'}</p>{bot.lastError && <div className="bot-card__warning"><AlertTriangle /> РџСЂРѕРІРµСЂСЊС‚Рµ РїРѕРґРєР»СЋС‡РµРЅРёРµ</div>}<div className="bot-card__meta"><span><MessageCircleMore /> {chats.length} С‡Р°С‚РѕРІ</span>{unread > 0 && <span className="unread-label">{unread} РЅРѕРІС‹С…</span>}</div><button className="button button--card" onClick={() => onOpen(bot)}>РћС‚РєСЂС‹С‚СЊ СЃРѕРѕР±С‰РµРЅРёСЏ <ChevronRight /></button></article>;
-    })}{state.bots.length < 15 && <button className="bot-card bot-card--add" onClick={onAdd}><span><Plus /></span><b>РџРѕРґРєР»СЋС‡РёС‚СЊ РµС‰С‘ Р±РѕС‚Р°</b><small>РћСЃС‚Р°Р»РѕСЃСЊ РјРµСЃС‚: {15 - state.bots.length}</small></button>}</section>
+      return <article className="bot-card" key={bot.id}><div className="bot-card__top"><Avatar title={bot.name} botId={bot.id} fileId={bot.avatarFileId} size="lg" online={bot.status === 'online'} /><div className="bot-card__actions"><span className={`status-chip status-chip--${bot.status}`}>{bot.status === 'online' ? <Wifi /> : bot.status === 'syncing' ? <RefreshCw className="spin" /> : <WifiOff />}{bot.status === 'online' ? 'На связи' : bot.status === 'syncing' ? 'Обновление' : 'Нет входящих'}</span><button className="icon-button danger-on-hover" onClick={() => onRemove(bot)} aria-label={`Удалить ${bot.name}`}><Trash2 /></button></div></div><h2>{bot.name}</h2><p>@{bot.username || 'без username'}</p>{bot.lastError && <div className="bot-card__warning"><AlertTriangle /> Проверьте подключение</div>}<div className="bot-card__meta"><span><MessageCircleMore /> {chats.length} чатов</span>{unread > 0 && <span className="unread-label">{unread} новых</span>}</div><button className="button button--card" onClick={() => onOpen(bot)}>Открыть сообщения <ChevronRight /></button></article>;
+    })}{state.bots.length < 15 && <button className="bot-card bot-card--add" onClick={onAdd}><span><Plus /></span><b>Подключить ещё бота</b><small>Осталось мест: {15 - state.bots.length}</small></button>}</section>
   </main></div>;
 }
 
 function ChatRow({ chat, botId, active, onClick }: { chat: Chat; botId: string; active: boolean; onClick: () => void }) {
-  return <button className={`chat-row ${active ? 'is-active' : ''}`} onClick={onClick} aria-label={`РћС‚РєСЂС‹С‚СЊ РґРёР°Р»РѕРі СЃ ${chat.title}`}><Avatar title={chat.title} botId={botId} fileId={chat.avatarFileId} size="md" /><span className="chat-row__body"><span className="chat-row__line"><b>{chat.title}</b><time>{timeLabel(chat.lastMessageAt)}</time></span><span className="chat-row__line"><small>{chat.lastMessage || (chat.username ? `@${chat.username}` : `ID ${chat.telegramId}`)}</small>{chat.unreadCount > 0 && <i>{chat.unreadCount > 99 ? '99+' : chat.unreadCount}</i>}</span></span></button>;
+  return <button className={`chat-row ${active ? 'is-active' : ''}`} onClick={onClick} aria-label={`Открыть диалог с ${chat.title}`}><Avatar title={chat.title} botId={botId} fileId={chat.avatarFileId} size="md" /><span className="chat-row__body"><span className="chat-row__line"><b>{chat.title}</b><time>{timeLabel(chat.lastMessageAt)}</time></span><span className="chat-row__line"><small>{chat.lastMessage || (chat.username ? `@${chat.username}` : `ID ${chat.telegramId}`)}</small>{chat.unreadCount > 0 && <i>{chat.unreadCount > 99 ? '99+' : chat.unreadCount}</i>}</span></span></button>;
 }
 
 function mediaLabel(type: NonNullable<Message['media']>['type']) {
-  const labels = { photo: 'Р¤РѕС‚Рѕ', sticker: 'РЎС‚РёРєРµСЂ', video: 'Р’РёРґРµРѕ', video_note: 'РљСЂСѓР¶РѕРє', voice: 'Р“РѕР»РѕСЃРѕРІРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ' };
-  return labels[type] || 'РњРµРґРёР°';
+  const labels = { photo: 'Фото', sticker: 'Стикер', video: 'Видео', video_note: 'Кружок', voice: 'Голосовое сообщение' };
+  return labels[type] || 'Медиа';
 }
 
 function mediaIcon(type: NonNullable<Message['media']>['type']) {
@@ -232,23 +232,23 @@ function MessageMediaView({ botId, message }: { botId: string; message: Message 
 function Conversation({ bot, chat, messages, syncing, onRetry, onSend }: { bot: Bot; chat?: Chat; messages: Message[]; syncing: boolean; onRetry: () => void; onSend: (text: string) => Promise<void> }) {
   const [draft, setDraft] = useState(''); const [sending, setSending] = useState(false); const messagesRef = useRef<HTMLDivElement>(null);
   useEffect(() => { const container = messagesRef.current; if (container) container.scrollTop = container.scrollHeight; }, [messages.length, chat?.id]);
-  if (!chat) return <section className="conversation conversation--empty"><div className="empty-conversation"><span><MessageCircleMore /></span><h2>Р’С‹Р±РµСЂРёС‚Рµ РґРёР°Р»РѕРі</h2><p>РЎРѕРѕР±С‰РµРЅРёСЏ Рё РёРЅС„РѕСЂРјР°С†РёСЏ Рѕ РїРѕР»СЊР·РѕРІР°С‚РµР»Рµ РїРѕСЏРІСЏС‚СЃСЏ Р·РґРµСЃСЊ.</p></div></section>;
+  if (!chat) return <section className="conversation conversation--empty"><div className="empty-conversation"><span><MessageCircleMore /></span><h2>Выберите диалог</h2><p>Сообщения и информация о пользователе появятся здесь.</p></div></section>;
   const send = async () => { const text = draft.trim(); if (!text || sending) return; setSending(true); try { await onSend(text); setDraft(''); } finally { setSending(false); } };
   const keyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } };
   let previousDay = '';
-  return <section className="conversation"><header className="conversation__header"><Avatar title={chat.title} botId={bot.id} fileId={chat.avatarFileId} size="sm" /><div><b>{chat.title}</b><small>{chat.username ? `@${chat.username} В· ` : ''}ID {chat.telegramId}</small></div><span className={`live-state ${bot.status === 'online' ? 'is-online' : 'is-offline'}`}>{bot.status === 'online' ? <Radio /> : <WifiOff />}{bot.status === 'online' ? 'Р’С…РѕРґСЏС‰РёРµ РІРєР»СЋС‡РµРЅС‹' : 'РќРµС‚ СЃРѕРµРґРёРЅРµРЅРёСЏ'}</span></header>
-    {bot.lastError && <div className="connection-banner" role="alert"><AlertTriangle /><span><b>Р’С…РѕРґСЏС‰РёРµ СЃРѕРѕР±С‰РµРЅРёСЏ РІСЂРµРјРµРЅРЅРѕ РЅРµ РїРѕСЃС‚СѓРїР°СЋС‚</b><small>{bot.lastError}</small></span><button onClick={onRetry} disabled={syncing}>{syncing ? <LoaderCircle className="spin" /> : <RefreshCw />} РџРѕРІС‚РѕСЂРёС‚СЊ</button></div>}
+  return <section className="conversation"><header className="conversation__header"><Avatar title={chat.title} botId={bot.id} fileId={chat.avatarFileId} size="sm" /><div><b>{chat.title}</b><small>{chat.username ? `@${chat.username} · ` : ''}ID {chat.telegramId}</small></div><span className={`live-state ${bot.status === 'online' ? 'is-online' : 'is-offline'}`}>{bot.status === 'online' ? <Radio /> : <WifiOff />}{bot.status === 'online' ? 'Входящие включены' : 'Нет соединения'}</span></header>
+    {bot.lastError && <div className="connection-banner" role="alert"><AlertTriangle /><span><b>Входящие сообщения временно не поступают</b><small>{bot.lastError}</small></span><button onClick={onRetry} disabled={syncing}>{syncing ? <LoaderCircle className="spin" /> : <RefreshCw />} Повторить</button></div>}
     <div className="messages" ref={messagesRef} aria-live="polite">
-      {messages.length === 0 && <div className="history-start"><ShieldCheck /><span><b>Р”РёР°Р»РѕРі РїРѕРґРєР»СЋС‡С‘РЅ</b><small>РћР¶РёРґР°РµРј РЅРѕРІРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ. РЎС‚Р°СЂР°СЏ РёСЃС‚РѕСЂРёСЏ РЅРµРґРѕСЃС‚СѓРїРЅР° С‡РµСЂРµР· Bot API.</small></span></div>}
+      {messages.length === 0 && <div className="history-start"><ShieldCheck /><span><b>Диалог подключён</b><small>Ожидаем новое сообщение пользователя. Старая история недоступна через Bot API.</small></span></div>}
       {messages.map((message) => {
         const day = dayLabel(message.sentAt);
         const showDay = day !== previousDay;
         const showText = !message.media || message.text !== mediaLabel(message.media.type);
         previousDay = day;
-        return <div key={message.id}>{showDay && <div className="day-divider"><span>{day}</span></div>}<div className={`message-line message-line--${message.direction}`}>{message.direction === 'incoming' && <Avatar title={message.senderName || chat.title} botId={bot.id} fileId={chat.avatarFileId} size="sm" />}<div className="message-stack">{message.direction === 'incoming' && <b className="message-sender">{message.senderName || chat.title}</b>}<div className={`message-bubble ${message.media ? 'message-bubble--media' : ''}`}><MessageMediaView botId={bot.id} message={message} />{showText && <p>{message.text}</p>}<span>{timeLabel(message.sentAt)} {message.direction === 'outgoing' && <Check aria-label="РћС‚РїСЂР°РІР»РµРЅРѕ" />}</span></div></div></div></div>;
+        return <div key={message.id}>{showDay && <div className="day-divider"><span>{day}</span></div>}<div className={`message-line message-line--${message.direction}`}>{message.direction === 'incoming' && <Avatar title={message.senderName || chat.title} botId={bot.id} fileId={chat.avatarFileId} size="sm" />}<div className="message-stack">{message.direction === 'incoming' && <b className="message-sender">{message.senderName || chat.title}</b>}<div className={`message-bubble ${message.media ? 'message-bubble--media' : ''}`}><MessageMediaView botId={bot.id} message={message} />{showText && <p>{message.text}</p>}<span>{timeLabel(message.sentAt)} {message.direction === 'outgoing' && <Check aria-label="Отправлено" />}</span></div></div></div></div>;
       })}
     </div>
-    <footer className="composer"><textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={keyDown} placeholder={`РЎРѕРѕР±С‰РµРЅРёРµ РґР»СЏ ${chat.firstName || chat.title}`} rows={1} maxLength={4096} aria-label="РўРµРєСЃС‚ СЃРѕРѕР±С‰РµРЅРёСЏ" /><span className="composer__count">{draft.length > 3800 ? `${draft.length}/4096` : ''}</span><button onClick={() => void send()} disabled={!draft.trim() || sending} aria-label="РћС‚РїСЂР°РІРёС‚СЊ СЃРѕРѕР±С‰РµРЅРёРµ">{sending ? <LoaderCircle className="spin" /> : <Send />}</button></footer>
+    <footer className="composer"><textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={keyDown} placeholder={`Сообщение для ${chat.firstName || chat.title}`} rows={1} maxLength={4096} aria-label="Текст сообщения" /><span className="composer__count">{draft.length > 3800 ? `${draft.length}/4096` : ''}</span><button onClick={() => void send()} disabled={!draft.trim() || sending} aria-label="Отправить сообщение">{sending ? <LoaderCircle className="spin" /> : <Send />}</button></footer>
   </section>;
 }
 
@@ -257,18 +257,18 @@ function Workspace({ state, bot, onState, onHome, onAdd, notify }: { state: AppS
   const chats = state.chatsByBot[bot.id] || [];
   const filtered = useMemo(() => { const q = query.trim().toLowerCase(); return q ? chats.filter((c) => `${c.title} ${c.username || ''} ${c.telegramId}`.toLowerCase().includes(q)) : chats; }, [chats, query]);
   const activeChat = chats.find((chat) => chat.id === activeChatId); const messages = activeChatId ? state.messagesByBot[bot.id]?.[activeChatId] || [] : [];
-  const sync = async (quiet = false) => { if (syncing) return; setSyncing(true); try { onState(await window.tgManager.syncBot(bot.id)); if (!quiet) notify('Р”РёР°Р»РѕРіРё СЃРёРЅС…СЂРѕРЅРёР·РёСЂРѕРІР°РЅС‹', 'success'); } catch (e) { if (!quiet) notify(e instanceof Error ? e.message : 'РћС€РёР±РєР° СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё', 'error'); } finally { setSyncing(false); } };
+  const sync = async (quiet = false) => { if (syncing) return; setSyncing(true); try { onState(await window.tgManager.syncBot(bot.id)); if (!quiet) notify('Диалоги синхронизированы', 'success'); } catch (e) { if (!quiet) notify(e instanceof Error ? e.message : 'Ошибка синхронизации', 'error'); } finally { setSyncing(false); } };
   const openChat = async (chat: Chat) => { setActiveChatId(chat.id); if (chat.unreadCount) { try { onState(await window.tgManager.markRead(bot.id, chat.id)); } catch { /* local UI remains usable */ } } };
   useEffect(() => { if (!activeChatId && chats[0]) void openChat(chats[0]); }, [bot.id, chats[0]?.id]);
-  const find = async (event: FormEvent) => { event.preventDefault(); setFinding(true); try { const result = await window.tgManager.findChat(bot.id, userId); onState(result.state); setActiveChatId(result.chatId); setShowId(false); setUserId(''); notify('Р”РёР°Р»РѕРі РЅР°Р№РґРµРЅ', 'success'); } catch (e) { notify(e instanceof Error ? e.message : 'Р§Р°С‚ РЅРµ РЅР°Р№РґРµРЅ', 'error'); } finally { setFinding(false); } };
-  const send = async (text: string) => { if (!activeChatId) return; try { onState(await window.tgManager.sendMessage(bot.id, activeChatId, text)); } catch (e) { notify(e instanceof Error ? e.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РїСЂР°РІРёС‚СЊ СЃРѕРѕР±С‰РµРЅРёРµ', 'error'); throw e; } };
+  const find = async (event: FormEvent) => { event.preventDefault(); setFinding(true); try { const result = await window.tgManager.findChat(bot.id, userId); onState(result.state); setActiveChatId(result.chatId); setShowId(false); setUserId(''); notify('Диалог найден', 'success'); } catch (e) { notify(e instanceof Error ? e.message : 'Чат не найден', 'error'); } finally { setFinding(false); } };
+  const send = async (text: string) => { if (!activeChatId) return; try { onState(await window.tgManager.sendMessage(bot.id, activeChatId, text)); } catch (e) { notify(e instanceof Error ? e.message : 'Не удалось отправить сообщение', 'error'); throw e; } };
   return <div className="app-shell"><BotRail bots={state.bots} activeId={bot.id} onHome={onHome} onOpen={async (next) => { onState(await window.tgManager.selectBot(next.id)); setActiveChatId(undefined); }} onAdd={onAdd} />
-    <aside className="chat-panel"><header className="chat-panel__header"><button className="mobile-back" onClick={onHome} aria-label="РќР°Р·Р°Рґ Рє Р±РѕС‚Р°Рј"><ArrowLeft /></button><div className="bot-heading"><Avatar title={bot.name} botId={bot.id} fileId={bot.avatarFileId} size="sm" online={bot.status === 'online'} /><span><b>{bot.name}</b><small>@{bot.username}</small></span></div><button className="icon-button" onClick={() => void sync()} aria-label="РЎРёРЅС…СЂРѕРЅРёР·РёСЂРѕРІР°С‚СЊ" disabled={syncing}><RefreshCw className={syncing ? 'spin' : ''} /></button></header>
-      <div className={`sync-strip sync-strip--${bot.status}`}>{bot.status === 'online' ? <Wifi /> : bot.status === 'syncing' ? <LoaderCircle className="spin" /> : <WifiOff />}<span><b>{bot.status === 'online' ? 'Р’С…РѕРґСЏС‰РёРµ Р°РєС‚РёРІРЅС‹' : bot.status === 'syncing' ? 'РџРѕР»СѓС‡Р°РµРј СЃРѕРѕР±С‰РµРЅРёСЏвЂ¦' : 'Р’С…РѕРґСЏС‰РёРµ РѕСЃС‚Р°РЅРѕРІР»РµРЅС‹'}</b><small>{bot.lastSyncAt ? <>РџРѕСЃР»РµРґРЅСЏСЏ РїСЂРѕРІРµСЂРєР° {timeLabel(bot.lastSyncAt)}</> : 'РџСЂРѕРІРµСЂСЏРµРј СЃРѕРµРґРёРЅРµРЅРёРµ'}</small></span></div>
-      <div className="chat-tools"><div className="search-box"><Search /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="РРјСЏ, username РёР»Рё ID" aria-label="РџРѕРёСЃРє РґРёР°Р»РѕРіРѕРІ" />{query && <button onClick={() => setQuery('')} aria-label="РћС‡РёСЃС‚РёС‚СЊ РїРѕРёСЃРє"><X /></button>}</div><button className="id-button" onClick={() => setShowId(true)}><UserRoundSearch /> РћС‚РєСЂС‹С‚СЊ РїРѕ ID</button></div>
-      <div className="chat-list">{filtered.length ? filtered.map((chat) => <ChatRow key={chat.id} chat={chat} botId={bot.id} active={chat.id === activeChatId} onClick={() => void openChat(chat)} />) : <div className="empty-list"><span><Inbox /></span><b>{query ? 'РќРёС‡РµРіРѕ РЅРµ РЅР°Р№РґРµРЅРѕ' : 'РџРѕРєР° РЅРµС‚ РґРёР°Р»РѕРіРѕРІ'}</b><p>{query ? 'РџРѕРїСЂРѕР±СѓР№С‚Рµ РґСЂСѓРіРѕР№ Р·Р°РїСЂРѕСЃ.' : 'РќР°Р¶РјРёС‚Рµ В«РћР±РЅРѕРІРёС‚СЊВ» РёР»Рё РѕС‚РєСЂРѕР№С‚Рµ С‡Р°С‚ РїРѕ ID.'}</p></div>}</div>
+    <aside className="chat-panel"><header className="chat-panel__header"><button className="mobile-back" onClick={onHome} aria-label="Назад к ботам"><ArrowLeft /></button><div className="bot-heading"><Avatar title={bot.name} botId={bot.id} fileId={bot.avatarFileId} size="sm" online={bot.status === 'online'} /><span><b>{bot.name}</b><small>@{bot.username}</small></span></div><button className="icon-button" onClick={() => void sync()} aria-label="Синхронизировать" disabled={syncing}><RefreshCw className={syncing ? 'spin' : ''} /></button></header>
+      <div className={`sync-strip sync-strip--${bot.status}`}>{bot.status === 'online' ? <Wifi /> : bot.status === 'syncing' ? <LoaderCircle className="spin" /> : <WifiOff />}<span><b>{bot.status === 'online' ? 'Входящие активны' : bot.status === 'syncing' ? 'Получаем сообщения…' : 'Входящие остановлены'}</b><small>{bot.lastSyncAt ? <>Последняя проверка {timeLabel(bot.lastSyncAt)}</> : 'Проверяем соединение'}</small></span></div>
+      <div className="chat-tools"><div className="search-box"><Search /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Имя, username или ID" aria-label="Поиск диалогов" />{query && <button onClick={() => setQuery('')} aria-label="Очистить поиск"><X /></button>}</div><button className="id-button" onClick={() => setShowId(true)}><UserRoundSearch /> Открыть по ID</button></div>
+      <div className="chat-list">{filtered.length ? filtered.map((chat) => <ChatRow key={chat.id} chat={chat} botId={bot.id} active={chat.id === activeChatId} onClick={() => void openChat(chat)} />) : <div className="empty-list"><span><Inbox /></span><b>{query ? 'Ничего не найдено' : 'Пока нет диалогов'}</b><p>{query ? 'Попробуйте другой запрос.' : 'Нажмите «Обновить» или откройте чат по ID.'}</p></div>}</div>
     </aside><Conversation bot={bot} chat={activeChat} messages={messages} syncing={syncing} onRetry={() => void sync()} onSend={send} />
-    {showId && <Modal onClose={() => setShowId(false)} labelledBy="find-title"><button className="modal__close" onClick={() => setShowId(false)} aria-label="Р—Р°РєСЂС‹С‚СЊ"><X /></button><span className="modal__icon"><Hash /></span><h2 id="find-title">РћС‚РєСЂС‹С‚СЊ РґРёР°Р»РѕРі РїРѕ ID</h2><p>Р•СЃР»Рё РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ СѓР¶Рµ РѕР±С‰Р°Р»СЃСЏ СЃ Р±РѕС‚РѕРј, Telegram СЂР°Р·СЂРµС€РёС‚ РѕС‚РєСЂС‹С‚СЊ СЌС‚РѕС‚ С‡Р°С‚.</p><form onSubmit={find}><div className="field"><label htmlFor="user-id">Telegram user ID</label><input id="user-id" inputMode="numeric" value={userId} onChange={(e) => setUserId(e.target.value.replace(/[^\d-]/g, ''))} placeholder="РќР°РїСЂРёРјРµСЂ, 123456789" autoFocus /></div><div className="form-actions"><button type="button" className="button button--quiet" onClick={() => setShowId(false)}>РћС‚РјРµРЅР°</button><button className="button button--primary" disabled={!userId || finding}>{finding ? <><LoaderCircle className="spin" /> РС‰СѓвЂ¦</> : 'РќР°Р№С‚Рё РґРёР°Р»РѕРі'}</button></div></form><small className="modal__hint"><ShieldCheck /> Р‘РѕС‚ РЅРµ РјРѕР¶РµС‚ РїРµСЂРІС‹Рј РЅР°РїРёСЃР°С‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЋ, РєРѕС‚РѕСЂС‹Р№ СЃ РЅРёРј РµС‰С‘ РЅРµ РІР·Р°РёРјРѕРґРµР№СЃС‚РІРѕРІР°Р».</small></Modal>}
+    {showId && <Modal onClose={() => setShowId(false)} labelledBy="find-title"><button className="modal__close" onClick={() => setShowId(false)} aria-label="Закрыть"><X /></button><span className="modal__icon"><Hash /></span><h2 id="find-title">Открыть диалог по ID</h2><p>Если пользователь уже общался с ботом, Telegram разрешит открыть этот чат.</p><form onSubmit={find}><div className="field"><label htmlFor="user-id">Telegram user ID</label><input id="user-id" inputMode="numeric" value={userId} onChange={(e) => setUserId(e.target.value.replace(/[^\d-]/g, ''))} placeholder="Например, 123456789" autoFocus /></div><div className="form-actions"><button type="button" className="button button--quiet" onClick={() => setShowId(false)}>Отмена</button><button className="button button--primary" disabled={!userId || finding}>{finding ? <><LoaderCircle className="spin" /> Ищу…</> : 'Найти диалог'}</button></div></form><small className="modal__hint"><ShieldCheck /> Бот не может первым написать пользователю, который с ним ещё не взаимодействовал.</small></Modal>}
   </div>;
 }
 
@@ -277,10 +277,10 @@ export default function App() {
   const [state, setState] = useState<AppState>(demoMode ? demoState : emptyState); const [loading, setLoading] = useState(true); const [screen, setScreen] = useState<'bots' | 'workspace'>(demoMode === 'workspace' ? 'workspace' : 'bots'); const [addOpen, setAddOpen] = useState(false); const [removeBot, setRemoveBot] = useState<Bot>(); const [toast, setToast] = useState<{ text: string; type: 'error' | 'success' }>();
   useEffect(() => {
     if (!window.tgManager) { setLoading(false); return; }
-    window.tgManager.getState().then(setState).catch((e) => setToast({ text: e instanceof Error ? e.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РґР°РЅРЅС‹Рµ', type: 'error' })).finally(() => setLoading(false));
+    window.tgManager.getState().then(setState).catch((e) => setToast({ text: e instanceof Error ? e.message : 'Не удалось загрузить данные', type: 'error' })).finally(() => setLoading(false));
     const stopState = window.tgManager.onStateChanged(setState);
     const stopSyncErrors = window.tgManager.onSyncError((payload) => {
-      setToast({ text: payload.message || 'РћС€РёР±РєР° СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё', type: 'error' });
+      setToast({ text: payload.message || 'Ошибка синхронизации', type: 'error' });
     });
     return () => {
       stopState();
@@ -289,14 +289,14 @@ export default function App() {
   }, []);
   useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(undefined), 4200); return () => window.clearTimeout(timer); }, [toast]);
   const notify = (text: string, type: 'error' | 'success' = 'success') => setToast({ text, type });
-  const openBot = async (bot: Bot) => { try { setState(await window.tgManager.selectBot(bot.id)); setScreen('workspace'); } catch (e) { notify(e instanceof Error ? e.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ Р±РѕС‚Р°', 'error'); } };
+  const openBot = async (bot: Bot) => { try { setState(await window.tgManager.selectBot(bot.id)); setScreen('workspace'); } catch (e) { notify(e instanceof Error ? e.message : 'Не удалось открыть бота', 'error'); } };
   const selectedBot = state.bots.find((bot) => bot.id === state.selectedBotId) || state.bots[0];
-  if (loading) return <main className="loading-screen"><span className="loading-logo"><BotIcon /></span><LoaderCircle className="spin" /><b>РћС‚РєСЂС‹РІР°РµРј BotDesk</b></main>;
-  const doneAdding = (next: AppState) => { setState(next); setAddOpen(false); setScreen('bots'); notify('Р‘РѕС‚ СѓСЃРїРµС€РЅРѕ РїРѕРґРєР»СЋС‡С‘РЅ'); };
-  const remove = async () => { if (!removeBot) return; try { setState(await window.tgManager.removeBot(removeBot.id)); setRemoveBot(undefined); notify('Р‘РѕС‚ СѓРґР°Р»С‘РЅ'); } catch (e) { notify(e instanceof Error ? e.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ Р±РѕС‚Р°', 'error'); } };
+  if (loading) return <main className="loading-screen"><span className="loading-logo"><BotIcon /></span><LoaderCircle className="spin" /><b>Открываем BotDesk</b></main>;
+  const doneAdding = (next: AppState) => { setState(next); setAddOpen(false); setScreen('bots'); notify('Бот успешно подключён'); };
+  const remove = async () => { if (!removeBot) return; try { setState(await window.tgManager.removeBot(removeBot.id)); setRemoveBot(undefined); notify('Бот удалён'); } catch (e) { notify(e instanceof Error ? e.message : 'Не удалось удалить бота', 'error'); } };
   return <>{state.bots.length === 0 ? <Onboarding onDone={doneAdding} /> : screen === 'workspace' && selectedBot ? <Workspace state={state} bot={selectedBot} onState={setState} onHome={() => setScreen('bots')} onAdd={() => setAddOpen(true)} notify={notify} /> : <BotHub state={state} onOpen={(bot) => void openBot(bot)} onAdd={() => setAddOpen(true)} onRemove={setRemoveBot} />}
-    {addOpen && <Modal onClose={() => setAddOpen(false)} labelledBy="add-title"><button className="modal__close" onClick={() => setAddOpen(false)} aria-label="Р—Р°РєСЂС‹С‚СЊ"><X /></button><span className="modal__icon"><BotIcon /></span><h2 id="add-title">РџРѕРґРєР»СЋС‡РёС‚СЊ Р±РѕС‚Р°</h2><p>Р”РѕР±Р°РІСЊС‚Рµ РЅР°Р·РІР°РЅРёРµ Рё С‚РѕРєРµРЅ РёР· BotFather.</p><AddBotForm onDone={doneAdding} onCancel={() => setAddOpen(false)} /></Modal>}
-    {removeBot && <Modal onClose={() => setRemoveBot(undefined)} labelledBy="remove-title"><button className="modal__close" onClick={() => setRemoveBot(undefined)} aria-label="Р—Р°РєСЂС‹С‚СЊ"><X /></button><span className="modal__icon modal__icon--danger"><Trash2 /></span><h2 id="remove-title">РЈРґР°Р»РёС‚СЊ В«{removeBot.name}В»?</h2><p>Р›РѕРєР°Р»СЊРЅР°СЏ РёСЃС‚РѕСЂРёСЏ СЌС‚РѕРіРѕ Р±РѕС‚Р° С‚Р°РєР¶Рµ Р±СѓРґРµС‚ СѓРґР°Р»РµРЅР°. Р”РµР№СЃС‚РІРёРµ РЅРµР»СЊР·СЏ РѕС‚РјРµРЅРёС‚СЊ.</p><div className="form-actions"><button className="button button--quiet" onClick={() => setRemoveBot(undefined)}>РћС‚РјРµРЅР°</button><button className="button button--danger" onClick={() => void remove()}>РЈРґР°Р»РёС‚СЊ Р±РѕС‚Р°</button></div></Modal>}
-    {toast && <div className={`toast toast--${toast.type}`} role="status">{toast.type === 'success' ? <Check /> : <CircleHelp />}<span>{toast.text}</span><button onClick={() => setToast(undefined)} aria-label="Р—Р°РєСЂС‹С‚СЊ СѓРІРµРґРѕРјР»РµРЅРёРµ"><X /></button></div>}
+    {addOpen && <Modal onClose={() => setAddOpen(false)} labelledBy="add-title"><button className="modal__close" onClick={() => setAddOpen(false)} aria-label="Закрыть"><X /></button><span className="modal__icon"><BotIcon /></span><h2 id="add-title">Подключить бота</h2><p>Добавьте название и токен из BotFather.</p><AddBotForm onDone={doneAdding} onCancel={() => setAddOpen(false)} /></Modal>}
+    {removeBot && <Modal onClose={() => setRemoveBot(undefined)} labelledBy="remove-title"><button className="modal__close" onClick={() => setRemoveBot(undefined)} aria-label="Закрыть"><X /></button><span className="modal__icon modal__icon--danger"><Trash2 /></span><h2 id="remove-title">Удалить «{removeBot.name}»?</h2><p>Локальная история этого бота также будет удалена. Действие нельзя отменить.</p><div className="form-actions"><button className="button button--quiet" onClick={() => setRemoveBot(undefined)}>Отмена</button><button className="button button--danger" onClick={() => void remove()}>Удалить бота</button></div></Modal>}
+    {toast && <div className={`toast toast--${toast.type}`} role="status">{toast.type === 'success' ? <Check /> : <CircleHelp />}<span>{toast.text}</span><button onClick={() => setToast(undefined)} aria-label="Закрыть уведомление"><X /></button></div>}
   </>;
 }
