@@ -190,9 +190,10 @@ svg { width: 20px; height: 20px; stroke-width: 1.9; }
 .message-media--photo { width: auto; }
 .message-media--sticker { width: min(190px, 48vw); max-height: 220px; background: transparent; }
 .message-media--sticker-video { width: min(190px, 48vw); max-height: 220px; background: transparent; }
+.message-lottie { width: min(190px, 48vw); height: min(190px, 48vw); display: grid; place-items: center; }
 .message-media--video { width: min(360px, 64vw); }
 .message-media--video_note { width: 230px; height: 230px; border-radius: 50%; object-fit: cover; }
-.message-audio { width: min(320px, 64vw); height: 42px; display: block; }
+.message-audio { width: min(330px, 64vw); height: 44px; display: block; border-radius: 999px; }
 .media-card { width: min(320px, 64vw); min-height: 92px; padding: 14px; display: grid; align-content: center; justify-items: center; gap: 6px; border: 1px solid rgba(99,124,164,.18); border-radius: 15px; color: var(--muted); background: rgba(255,255,255,.48); text-align: center; }
 .media-card > svg { color: var(--blue); }
 .media-card > span { font-size: 28px; line-height: 1; }

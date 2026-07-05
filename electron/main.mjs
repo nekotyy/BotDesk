@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { gunzipSync } from 'node:zlib';
 import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron';
 import Store from 'electron-store';
 import { v4 as uuid } from 'uuid';
@@ -277,10 +278,25 @@ async function telegramFileData(botId, fileId, fallbackMimeType) {
   const mediaDir = path.join(app.getPath('userData'), 'media');
   const mediaPath = path.join(mediaDir, safeMediaName(botId, fileId, file.file_path, fallbackMimeType));
   const mimeType = fallbackMimeType || mimeFromPath(file.file_path);
+  const toPayload = (buffer, contentType = mimeType) => {
+    if (contentType === 'application/x-tgsticker') {
+      const json = gunzipSync(buffer).toString('utf8');
+      return {
+        kind: 'lottie',
+        mimeType: 'application/json',
+        json: JSON.parse(json),
+      };
+    }
+    return {
+      kind: contentType.startsWith('audio/') ? 'audio' : contentType.startsWith('video/') ? 'video' : 'image',
+      mimeType: contentType,
+      dataUrl: `data:${contentType};base64,${buffer.toString('base64')}`,
+    };
+  };
 
   try {
     const cached = await readFile(mediaPath);
-    return `data:${mimeType};base64,${cached.toString('base64')}`;
+    return toPayload(cached);
   } catch {
     // Cache miss; download from Telegram and persist for the local history view.
   }
@@ -292,7 +308,7 @@ async function telegramFileData(botId, fileId, fallbackMimeType) {
   const buffer = Buffer.from(await response.arrayBuffer());
   await mkdir(mediaDir, { recursive: true });
   await writeFile(mediaPath, buffer);
-  return `data:${responseMimeType};base64,${buffer.toString('base64')}`;
+  return toPayload(buffer, responseMimeType);
 }
 
 async function disableWebhookIfNeeded(token) {

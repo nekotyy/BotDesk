@@ -33,7 +33,10 @@
     ],
     "win": {
       "icon": "assets/icon.ico",
-      "target": ["nsis", "portable"]
+      "target": [
+        "nsis",
+        "portable"
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -49,6 +52,7 @@
   },
   "dependencies": {
     "electron-store": "^11.0.2",
+    "lottie-web": "^5.13.0",
     "lucide-react": "^0.468.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
