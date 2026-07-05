@@ -2,7 +2,8 @@ node_modules/
 dist/
 release/
 .tmp-sctb/
-media/
+media/*
+!media/banner.png
 *.log
 .DS_Store
 .env*
